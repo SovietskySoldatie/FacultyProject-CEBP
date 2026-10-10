@@ -1,0 +1,2 @@
+bureaucraticSystem.client.request will contain client-side request + scheduler logic
+    maybe under an event-based form, with blocking/non-blocking calls

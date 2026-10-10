@@ -1,0 +1,13 @@
+bureaucraticSystem.config.graph will contain:
+    config extraction
+        general dependencies
+            dependencies between required documents
+            counter types and yielded document(s)
+        specific conditions
+            set of counters with specified number of offices per counter
+            clients and their request(s)
+    dependency solving
+        dependency graph creation
+        graph exploration/search
+            suggestion: cache results, possibly immediately after graph creation => set of graphs created immediately for each type of request
+                given suggestion may be innapropiate depending on second phase specs/reqs

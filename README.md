@@ -16,7 +16,7 @@ Requirements may be found under the "reqs" folder.
 
 - [] Define project architecture
 	- [] Define software architecture
-		- [] Create package structure
+		- [x] Create package structure
 		- [] Create interfaces
 
 - [] Define software design
