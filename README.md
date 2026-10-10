@@ -9,7 +9,7 @@ The full project specifications may be found at https://docs.google.com/document
 Requirements may be found under the "reqs" folder.
 
 ## TO-DOs:
-- [] Add project original specifications
+- [x] Add project original specifications
 - [] Decompose project specifications
 - [] Add requirements
 - [] Decompose project requirements
