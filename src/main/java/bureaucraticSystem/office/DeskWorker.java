@@ -19,14 +19,14 @@ public class DeskWorker implements Runnable {
     /**
      * Procesează cererea unui client:
      *  - simulează timpul de lucru al funcționarului (150ms)
-     *  - semnalează biletul de ordine al clientului ca finalizat
+     *  - marchează tichetul ca fiind finalizat cu succes
      */
     protected void processTicket(ServiceTicket ticket) throws InterruptedException {
         // Simulează redactarea și verificarea documentului
         Thread.sleep(150);
 
-        // Notifică clientul că actul a fost eliberat cu succes
-        ticket.completionSignal().complete(true);
+        // Notifică clientul că actul este gata
+        ticket.markCompleted();
     }
 
     /**

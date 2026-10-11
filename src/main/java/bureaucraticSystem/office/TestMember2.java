@@ -2,16 +2,14 @@ package bureaucraticSystem.office;
 
 import bureaucraticSystem.common.CommonTypes.ServiceTicket;
 
-import java.util.concurrent.CompletableFuture;
-
 /**
  * Test simplu și clar pentru Membru 2:
  * Demonstrăm cum funcționează coada (OfficeQueue) și ghișeul (DeskWorker).
  *
  * Scenariul din test:
  * 1. Se deschide ghișeul "Desk-1" pe un fir de execuție separat.
- * 2. Trei clienți vin pe rând, își depun cererea la coadă și așteaptă biletul de ordine.
- * 3. Ghișeul preia cererea, o rezolvă și anunță clientul.
+ * 2. Trei clienți vin pe rând, își depun cererea la coadă și așteaptă la rând.
+ * 3. Ghișeul preia cererea, o rezolvă și marchează tichetul ca finalizat.
  * 4. Clientul își ia actul și pleacă.
  * 5. Ghișeul se închide curat.
  */
@@ -31,19 +29,14 @@ public class TestMember2 {
         for (int i = 1; i <= 3; i++) {
             String clientName = "Client-" + i;
 
-            // Fiecare client își creează un bilet de ordine / bipăitor (CompletableFuture)
-            // La început este gol (actul nu e gata încă)
-            CompletableFuture<Boolean> biletDeOrdine = new CompletableFuture<>();
-
-            // Clientul completează tichetul de cerere cu numele lui, actul dorit și biletul de ordine
-            ServiceTicket tichet = new ServiceTicket(clientName, "CertificatNastere", biletDeOrdine);
+            // Clientul completează un tichet cu numele lui și actul dorit
+            ServiceTicket tichet = new ServiceTicket(clientName, "CertificatNastere");
 
             System.out.println(">> " + clientName + " se așază la coadă.");
             queue.addTicket(tichet);
 
-            // Clientul așteaptă până când sună biletul de ordine!
-            // Metoda .get() pune firul curent în pauză până când ghișeul apelează complete(true)
-            boolean actFinalizat = biletDeOrdine.get();
+            // Clientul stă la rând până când ghișeul finalizează actul
+            boolean actFinalizat = tichet.waitForCompletion();
 
             if (actFinalizat) {
                 System.out.println("<< " + clientName + " și-a primit actul și pleacă mulțumit!\n");
@@ -52,8 +45,8 @@ public class TestMember2 {
 
         // 4. Toți clienții au fost serviți. Închidem ghișeul curat (graceful shutdown)
         desk.stop();              // setăm running = false
-        deskThread.interrupt();   // deblocăm ghișeul dacă aștepta în queue.takeTicket()
-        deskThread.join(2000);    // așteptăm maxim 2 secunde ca firul să se termine frumos
+        deskThread.interrupt();   // deblocăm ghișeul dacă aștepta în coadă
+        deskThread.join(2000);    // așteptăm să se oprească firul
 
         System.out.println("=== TestMember2 finalizat cu succes! ===");
     }

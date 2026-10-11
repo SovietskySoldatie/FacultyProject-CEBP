@@ -55,3 +55,4 @@ public class OfficeQueue {
         return queue.isEmpty();
     }
 }
+
