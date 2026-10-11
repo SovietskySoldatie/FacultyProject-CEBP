@@ -2,42 +2,31 @@ package bureaucraticSystem.office;
 
 import bureaucraticSystem.common.CommonTypes.ServiceTicket;
 
-import java.util.function.Consumer;
-
 /**
  * Reprezintă un ghișeu individual dintr-un birou, care rulează pe propriul său fir de execuție (Thread).
- * Extrage tichete din OfficeQueue și le rezolvă.
+ * Extrage tichete din OfficeQueue și le rezolvă într-un mod simplu și direct.
  */
 public class DeskWorker implements Runnable {
     private final String deskId;
     private final OfficeQueue queue;
-    private final Consumer<ServiceTicket> processCallback;
     private volatile boolean running = true;
 
-    /**
-     * Constructor simplu: procesare implicită.
-     * Simulează un scurt timp de lucru (150ms), apoi validează tichetul.
-     */
     public DeskWorker(String deskId, OfficeQueue queue) {
-        this(deskId, queue, ticket -> {
-            try {
-                Thread.sleep(150); // simulează timpul necesar eliberării actului
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            // Notifică clientul că actul este finalizat cu succes
-            ticket.completionSignal().complete(true);
-        });
+        this.deskId = deskId;
+        this.queue = queue;
     }
 
     /**
-     * Constructor flexibil: permite specificarea unei logici externe de procesare
-     * (de exemplu, când se adaugă ștampila unică sau verificarea pauzei de cafea).
+     * Procesează cererea unui client:
+     *  - simulează timpul de lucru al funcționarului (150ms)
+     *  - semnalează biletul de ordine al clientului ca finalizat
      */
-    public DeskWorker(String deskId, OfficeQueue queue, Consumer<ServiceTicket> processCallback) {
-        this.deskId = deskId;
-        this.queue = queue;
-        this.processCallback = processCallback;
+    protected void processTicket(ServiceTicket ticket) throws InterruptedException {
+        // Simulează redactarea și verificarea documentului
+        Thread.sleep(150);
+
+        // Notifică clientul că actul a fost eliberat cu succes
+        ticket.completionSignal().complete(true);
     }
 
     /**
@@ -61,14 +50,16 @@ public class DeskWorker implements Runnable {
         System.out.println("Ghișeul " + deskId + " s-a deschis.");
         while (running && !Thread.currentThread().isInterrupted()) {
             try {
-                // Așteaptă la coadă un tichet (operație blocantă thread-safe)
+                // 1. Așteaptă la coadă un tichet (operație blocantă thread-safe)
                 ServiceTicket ticket = queue.takeTicket();
                 System.out.println(deskId + " a preluat clientul: " + ticket.clientId());
 
-                // Procesează cererea
-                processCallback.accept(ticket);
+                // 2. Procesează direct tichetul
+                processTicket(ticket);
+
             } catch (InterruptedException e) {
-                // Dacă ghișeul este întrerupt în timp ce aștepta în coadă, restaurăm flag-ul și ieșim curat
+                // Dacă ghișeul este întrerupt în timp ce aștepta în coadă sau procesa actul,
+                // restaurăm fanionul de întrerupere și ieșim curat
                 Thread.currentThread().interrupt();
                 break;
             }
