@@ -113,6 +113,7 @@ public class Client implements Runnable {
                     break;
                 }
 
+                // Cazul 1 (General): Navigare pe baza grafului de dependențe (RouteResolver)
                 if (routeResolver != null) {
                     Optional<Document> nextDocOpt = routeResolver.resolveNextRequiredDocument(ownedDocuments, targetDocumentId);
                     if (nextDocOpt.isEmpty()) {
@@ -133,6 +134,9 @@ public class Client implements Runnable {
                         System.err.println("[" + clientId + "] Cererea a eșuat pentru actul " + nextDoc.getId());
                         break;
                     }
+                // Cazul 2 (Caz particular / Unit Tests):
+                // Util în scenarii de testare izolate (UTs) sau coadă unică (routeResolver == null).
+                // Clientul nu navighează un graf de dependențe, ci solicită direct actul dorit la coada dedicată.
                 } else if (officeQueueResolver != null) {
                     OfficeQueue queue = officeQueueResolver.apply(null);
                     if (queue == null) {
@@ -141,6 +145,8 @@ public class Client implements Runnable {
                     }
                     requestDocument(queue, targetDocumentId);
                     break;
+                // Cazul 3 (Eroare de configurare / Gardă defensivă):
+                // Niciun mecanism de rezolvare a cozilor sau a rutelor nu a fost configurat.
                 } else {
                     System.err.println("[" + clientId + "] Niciun rezolvitor de cozi configurat.");
                     break;
