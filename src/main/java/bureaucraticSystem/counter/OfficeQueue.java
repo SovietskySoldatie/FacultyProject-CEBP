@@ -1,6 +1,6 @@
-package bureaucraticSystem.office;
+package bureaucraticSystem.counter;
 
-import bureaucraticSystem.common.CommonTypes.ServiceTicket;
+import bureaucraticSystem.client.request.ServiceTicket;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -10,8 +10,8 @@ import java.util.concurrent.TimeUnit;
  * Coada thread-safe a unui birou.
  *
  * Folosește LinkedBlockingQueue (model Producer-Consumer):
- *  - Clienții adaugă cereri prin addTicket() (Producers)
- *  - Ghișeele (DeskWorker) preiau cereri prin takeTicket() (Consumers)
+ * - Clienții adaugă cereri prin addTicket() (Producers)
+ * - Ghișeele (DeskWorker) preiau cereri prin takeTicket() (Consumers)
  *
  * Dacă coada este goală, ghișeul este pus automat în așteptare (WAITING)
  * fără busy-waiting (fără consum inutil de procesor).
@@ -28,7 +28,8 @@ public class OfficeQueue {
 
     /**
      * Preia primul tichet din coadă (operație executată de ghișeu).
-     * Dacă coada este goală, firul de execuție se blochează până când sosește un client.
+     * Dacă coada este goală, firul de execuție se blochează până când sosește un
+     * client.
      */
     public ServiceTicket takeTicket() throws InterruptedException {
         return queue.take();
@@ -55,4 +56,3 @@ public class OfficeQueue {
         return queue.isEmpty();
     }
 }
-
