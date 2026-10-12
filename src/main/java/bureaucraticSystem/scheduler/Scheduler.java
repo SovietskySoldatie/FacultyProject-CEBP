@@ -14,17 +14,61 @@ import java.util.concurrent.ConcurrentHashMap;
  * și resursele sistemului birocratic (ghișee, cozi, disponibilitate).
  */
 public class Scheduler {
+    private static volatile Scheduler instance;
+    private static final Object LOCK = new Object();
+
     private final Map<String, OfficeQueue> officeQueues;
     private final DocumentRegistry documentRegistry;
     private volatile boolean running = true;
 
-    public Scheduler() {
+    /**
+     * Constructor privat pentru prevenirea instanțierii necontrolate din exterior.
+     */
+    private Scheduler() {
         this(null);
     }
 
-    public Scheduler(DocumentRegistry documentRegistry) {
+    /**
+     * Constructor protejat pentru inițializare specifică sau teste izolate (UTs).
+     */
+    protected Scheduler(DocumentRegistry documentRegistry) {
         this.documentRegistry = documentRegistry;
         this.officeQueues = new ConcurrentHashMap<>();
+    }
+
+    /**
+     * Returnează instanța unică (Singleton) a Scheduler-ului folosind Double-Checked Locking thread-safe.
+     */
+    public static Scheduler getInstance() {
+        return getInstance(null);
+    }
+
+    /**
+     * Returnează sau inițializează instanța unică cu un DocumentRegistry specificat.
+     */
+    public static Scheduler getInstance(DocumentRegistry documentRegistry) {
+        Scheduler localInstance = instance;
+        if (localInstance == null) {
+            synchronized (LOCK) {
+                localInstance = instance;
+                if (localInstance == null) {
+                    instance = localInstance = new Scheduler(documentRegistry);
+                }
+            }
+        }
+        return localInstance;
+    }
+
+    /**
+     * Reinițializează instanța Singleton (util pentru Unit Tests / scenarii de testare repetate).
+     */
+    public static void resetInstance() {
+        synchronized (LOCK) {
+            if (instance != null) {
+                instance.stop();
+            }
+            instance = null;
+        }
     }
 
     /**
@@ -51,13 +95,26 @@ public class Scheduler {
     }
 
     /**
-     * Alocă și plasează tichetul la coada biroului indicat.
-     * Aici se concentrează logica de thread-safety și dispatching a scheduler-ului.
+     * Metodă statică de dataflow: Alocă și plasează tichetul la coada biroului indicat.
      *
      * @param ticket   Tichetul creat de client
      * @param officeId ID-ul biroului la care este alocat tichetul
      */
-    public void dispatchTicket(ServiceTicket ticket, String officeId) throws InterruptedException {
+    public static void dispatchTicket(ServiceTicket ticket, String officeId) throws InterruptedException {
+        getInstance().dispatchTicketInternal(ticket, officeId);
+    }
+
+    /**
+     * Metodă statică de dataflow: Alocare automată pe baza registrului de documente.
+     */
+    public static void dispatchTicket(ServiceTicket ticket) throws InterruptedException {
+        getInstance().dispatchTicketInternal(ticket);
+    }
+
+    /**
+     * Implementarea internă a alocării la birou.
+     */
+    public void dispatchTicketInternal(ServiceTicket ticket, String officeId) throws InterruptedException {
         Objects.requireNonNull(ticket, "ticket must not be null");
         Objects.requireNonNull(officeId, "officeId must not be null");
 
@@ -77,14 +134,13 @@ public class Scheduler {
     }
 
     /**
-     * Alocare automată pe baza registrului de documente:
-     * Caută biroul emitent al actului cerut și plasează tichetul.
+     * Implementarea internă a alocării automate pe baza registrului.
      */
-    public void dispatchTicket(ServiceTicket ticket) throws InterruptedException {
+    public void dispatchTicketInternal(ServiceTicket ticket) throws InterruptedException {
         Objects.requireNonNull(ticket, "ticket must not be null");
 
         if (documentRegistry == null) {
-            throw(new IllegalStateException("DocumentRegistry nu a fost configurat în Scheduler!"));
+            throw new IllegalStateException("DocumentRegistry nu a fost configurat în Scheduler!");
         }
 
         Document doc = documentRegistry.getDocument(ticket.getDocumentId());
@@ -93,7 +149,7 @@ public class Scheduler {
             throw new IllegalArgumentException("Document necunoscut: " + ticket.getDocumentId());
         }
 
-        dispatchTicket(ticket, doc.getOfficeId());
+        dispatchTicketInternal(ticket, doc.getOfficeId());
     }
 
     public void stop() {

@@ -56,6 +56,15 @@ public class Client implements Runnable {
     }
 
     /**
+     * Constructor convenabil ce folosește automat instanța Singleton RouteResolver.getInstance().
+     */
+    public Client(String clientId,
+                  String targetDocumentId,
+                  Scheduler scheduler) {
+        this(clientId, targetDocumentId, RouteResolver.getInstance(), scheduler, Collections.emptySet());
+    }
+
+    /**
      * Constructor cu funcție de rezolvare a cozilor (pentru teste sau scenarii fără scheduler centralizat).
      */
     public Client(String clientId,

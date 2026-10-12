@@ -18,7 +18,7 @@ public class TestMembru1 {
         reg.registerDocument(new Document("DocB", "Office2", Set.of("DocA")));
         reg.registerDocument(new Document("DocC", "Office3", Set.of("DocB")));
 
-        RouteResolver resolver = new RouteResolver(reg);
+        RouteResolver resolver = RouteResolver.getInstance(reg);
 
         ExecutorService exec = Executors.newFixedThreadPool(4);
         for (int i = 0; i < 4; i++) {
