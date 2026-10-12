@@ -8,10 +8,10 @@ public class DocumentRegistry {
     private final Map<String, Document> documents = new ConcurrentHashMap<>();
 
     public void registerDocument(Document doc) {
-        if (doc == null || doc.id() == null) {
+        if (doc == null || doc.getId() == null) {
             throw new IllegalArgumentException("Documentul și ID-ul nu pot fi null");
         }
-        documents.put(doc.id(), doc);
+        documents.put(doc.getId(), doc);
     }
 
     public Document getDocument(String id) {

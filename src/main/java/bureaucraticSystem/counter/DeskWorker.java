@@ -1,9 +1,10 @@
-package bureaucraticSystem.office;
+package bureaucraticSystem.counter;
 
-import bureaucraticSystem.common.CommonTypes.ServiceTicket;
+import bureaucraticSystem.client.request.ServiceTicket;
 
 /**
- * Reprezintă un ghișeu individual dintr-un birou, care rulează pe propriul său fir de execuție (Thread).
+ * Reprezintă un ghișeu individual dintr-un birou, care rulează pe propriul său
+ * fir de execuție (Thread).
  * Extrage tichete din OfficeQueue și le rezolvă într-un mod simplu și direct.
  */
 public class DeskWorker implements Runnable {
@@ -18,8 +19,8 @@ public class DeskWorker implements Runnable {
 
     /**
      * Procesează cererea unui client:
-     *  - simulează timpul de lucru al funcționarului (150ms)
-     *  - marchează tichetul ca fiind finalizat cu succes
+     * - simulează timpul de lucru al funcționarului (150ms)
+     * - marchează tichetul ca fiind finalizat cu succes
      */
     protected void processTicket(ServiceTicket ticket) throws InterruptedException {
         // Simulează redactarea și verificarea documentului
@@ -31,7 +32,8 @@ public class DeskWorker implements Runnable {
 
     /**
      * Oprește bucla de lucru a ghișeului.
-     * Variabila 'running' este volatile pentru a asigura vizibilitatea imediată între thread-uri.
+     * Variabila 'running' este volatile pentru a asigura vizibilitatea imediată
+     * între thread-uri.
      */
     public void stop() {
         this.running = false;
@@ -52,7 +54,7 @@ public class DeskWorker implements Runnable {
             try {
                 // 1. Așteaptă la coadă un tichet (operație blocantă thread-safe)
                 ServiceTicket ticket = queue.takeTicket();
-                System.out.println(deskId + " a preluat clientul: " + ticket.clientId());
+                System.out.println(deskId + " a preluat clientul: " + ticket.getClientId());
 
                 // 2. Procesează direct tichetul
                 processTicket(ticket);

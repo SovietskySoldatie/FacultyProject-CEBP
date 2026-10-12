@@ -1,6 +1,6 @@
-package bureaucraticSystem.office;
+package bureaucraticSystem.counter;
 
-import bureaucraticSystem.common.CommonTypes.ServiceTicket;
+import bureaucraticSystem.client.request.ServiceTicket;
 
 /**
  * Test simplu și clar pentru Membru 2:
@@ -44,9 +44,9 @@ public class TestMember2 {
         }
 
         // 4. Toți clienții au fost serviți. Închidem ghișeul curat (graceful shutdown)
-        desk.stop();              // setăm running = false
-        deskThread.interrupt();   // deblocăm ghișeul dacă aștepta în coadă
-        deskThread.join(2000);    // așteptăm să se oprească firul
+        desk.stop(); // setăm running = false
+        deskThread.interrupt(); // deblocăm ghișeul dacă aștepta în coadă
+        deskThread.join(2000); // așteptăm să se oprească firul
 
         System.out.println("=== TestMember2 finalizat cu succes! ===");
     }
