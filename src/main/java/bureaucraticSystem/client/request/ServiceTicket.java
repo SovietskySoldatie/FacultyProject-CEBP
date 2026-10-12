@@ -30,26 +30,11 @@ public class ServiceTicket {
         return clientId;
     }
 
-    // Compatibilitate cu apelurile record-style
-    public String clientId() {
-        return clientId;
-    }
-
     public String getDocumentId() {
         return documentId;
     }
 
-    // Compatibilitate cu apelurile record-style
-    public String documentId() {
-        return documentId;
-    }
-
     public CompletableFuture<Boolean> getCompletionSignal() {
-        return completionSignal;
-    }
-
-    // Compatibilitate cu apelurile record-style
-    public CompletableFuture<Boolean> completionSignal() {
         return completionSignal;
     }
 

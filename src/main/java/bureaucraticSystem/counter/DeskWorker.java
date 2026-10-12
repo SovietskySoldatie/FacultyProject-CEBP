@@ -54,7 +54,7 @@ public class DeskWorker implements Runnable {
             try {
                 // 1. Așteaptă la coadă un tichet (operație blocantă thread-safe)
                 ServiceTicket ticket = queue.takeTicket();
-                System.out.println(deskId + " a preluat clientul: " + ticket.clientId());
+                System.out.println(deskId + " a preluat clientul: " + ticket.getClientId());
 
                 // 2. Procesează direct tichetul
                 processTicket(ticket);

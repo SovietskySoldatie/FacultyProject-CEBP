@@ -121,16 +121,16 @@ public class Client implements Runnable {
                     }
 
                     Document nextDoc = nextDocOpt.get();
-                    OfficeQueue queue = officeQueueResolver != null ? officeQueueResolver.apply(nextDoc.officeId()) : null;
+                    OfficeQueue queue = officeQueueResolver != null ? officeQueueResolver.apply(nextDoc.getOfficeId()) : null;
                     if (queue == null) {
-                        System.err.println("[" + clientId + "] Coada pentru biroul " + nextDoc.officeId() + " nu a fost găsită!");
+                        System.err.println("[" + clientId + "] Coada pentru biroul " + nextDoc.getOfficeId() + " nu a fost găsită!");
                         break;
                     }
 
-                    System.out.println("[" + clientId + "] Se așază la coada biroului " + nextDoc.officeId() + " pentru actul " + nextDoc.id());
-                    boolean success = requestDocument(queue, nextDoc.id());
+                    System.out.println("[" + clientId + "] Se așază la coada biroului " + nextDoc.getOfficeId() + " pentru actul " + nextDoc.getId());
+                    boolean success = requestDocument(queue, nextDoc.getId());
                     if (!success) {
-                        System.err.println("[" + clientId + "] Cererea a eșuat pentru actul " + nextDoc.id());
+                        System.err.println("[" + clientId + "] Cererea a eșuat pentru actul " + nextDoc.getId());
                         break;
                     }
                 } else if (officeQueueResolver != null) {

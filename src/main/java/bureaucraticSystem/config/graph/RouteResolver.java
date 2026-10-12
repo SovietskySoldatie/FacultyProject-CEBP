@@ -30,7 +30,7 @@ public class RouteResolver {
             throw new IllegalStateException("Dependență circulară detectată pentru actul: " + currentDocId);
         }
 
-        for (String reqId : target.prerequisites()) {
+        for (String reqId : target.getPrerequisites()) {
             if (!ownedDocs.contains(reqId)) {
                 // Dacă precondiția are la rândul ei dependențe nesatisfăcute, coborâm recursiv
                 return resolveRecursive(ownedDocs, reqId, visiting);

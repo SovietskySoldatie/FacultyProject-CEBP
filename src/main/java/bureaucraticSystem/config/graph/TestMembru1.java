@@ -25,7 +25,7 @@ public class TestMembru1 {
             exec.submit(() -> {
                 Set<String> owned = new HashSet<>();
                 var next = resolver.resolveNextRequiredDocument(owned, "DocC");
-                System.out.println(Thread.currentThread().getName() + " -> Primul act necesar: " + next.get().id());
+                System.out.println(Thread.currentThread().getName() + " -> Primul act necesar: " + next.get().getId());
             });
         }
 
