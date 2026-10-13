@@ -1,6 +1,8 @@
 package bureaucraticSystem.counter;
 
 import bureaucraticSystem.client.request.ServiceTicket;
+import bureaucraticSystem.resource.CoffeeBreakScheduler;
+import bureaucraticSystem.resource.OfficialStamp;
 
 /**
  * Reprezintă un ghișeu individual dintr-un birou, care rulează pe propriul său
@@ -12,11 +14,21 @@ public class DeskWorker implements Runnable {
     private final OfficeQueue queue;
     private volatile boolean running = true;
 
+    //bia is here, sorry to disrupt peace
+    private final CoffeeBreakScheduler breakScheduler;
+    private final OfficialStamp stamp;
+    //
+
     public DeskWorker(String deskId, OfficeQueue queue) {
-        this.deskId = deskId;
-        this.queue = queue;
+        this(deskId, queue, null, null);
     }
 
+    public DeskWorker(String deskId, OfficeQueue queue, CoffeeBreakScheduler breakScheduler, OfficialStamp stamp) {
+        this.deskId = deskId;
+        this.queue = queue;
+        this.breakScheduler = breakScheduler;
+        this.stamp = stamp;
+    }
     /**
      * Procesează cererea unui client:
      * - simulează timpul de lucru al funcționarului (150ms)
@@ -24,7 +36,18 @@ public class DeskWorker implements Runnable {
      */
     protected void processTicket(ServiceTicket ticket) throws InterruptedException {
         // Simulează redactarea și verificarea documentului
+        while (breakScheduler != null && breakScheduler.isOnBreak(deskId)) {
+            System.out.println(deskId + " așteaptă terminarea pauzei de cafea...");
+            Thread.sleep(300);
+        }
+
+        // Simulează redactarea și verificarea documentului (cum era înainte)
         Thread.sleep(150);
+
+        // 2. Folosește ștampila unică (să zicem 200ms)
+        if (stamp != null) {
+            stamp.useStamp(deskId, 200);
+        }
 
         // Notifică clientul că actul este gata
         ticket.markCompleted();

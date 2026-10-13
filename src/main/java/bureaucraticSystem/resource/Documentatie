@@ -1,0 +1,51 @@
+Documentație Tehnică: Coordonator de Sistem Birocratic
+
+A. Descrierea Proiectului
+Acest proiect este o aplicație multi-threading scrisă în Java care simulează procedurile complexe dintr-un sistem birocratic clasic. Scopul principal este modelarea programării concurente, a sincronizării între multiple fire de execuție (Threads) și a gestionării resurselor partajate.
+Într-un sistem birocratic real, documentele complexe (ex: Pașaport) nu se obțin direct, ci necesită un set de documente precondiție (ex: Certificat de Naștere, Adeverință). Aplicația rutează clienții automat prin calculul unui graf de dependențe, îi așază la cozi și simulează ghișeele care procesează actele.
+Sistemul include blocaje specifice vieții reale: întârzieri neprevăzute (pauze de cafea) și resurse partajate cu acces exclusiv (o ștampilă unică per instituție).
+
+B. Arhitectura Sistemului
+Codul este decuplat în cinci pachete principale:
+
+1. bureaucraticSystem.client (Clienții și Cererile)
+Client: Reprezintă cetățeanul care interacționează cu sistemul. Rulează pe un fir de execuție independent (Runnable).
+Interoghează RouteResolver pentru a afla pașii intermediari, generează un tichet și așteaptă la coada indicată.
+request.ServiceTicket: Obiectul de sincronizare între Client și Ghișeu. Folosește un CompletableFuture<Boolean> ce permite clientului să aștepte rezultatul (waitForCompletion()) fără busy-waiting, până când funcționarul finalizează prelucrarea (markCompleted()).
+
+2. bureaucraticSystem.config (Date și Rutare)
+data.Document & data.DocumentRegistry: Definesc structura imutabilă a unui act (ID, Birou emitent, Precondiții) și stocarea acestora într-un registru global, bazat pe ConcurrentHashMap.
+graph.RouteResolver: Un Singleton thread-safe responsabil cu analiza grafului de dependențe (Directed Acyclic Graph).
+Coboară recursiv prin precondiții pentru a găsi primul act necesar pe care clientul nu îl deține încă.
+Include mecanisme de protecție împotriva dependențelor circulare.
+
+3. bureaucraticSystem.counter (Infrastructura Birourilor)
+OfficeQueue: Coada thread-safe a unui birou. Folosește LinkedBlockingQueue pentru a implementa un model de tip Producer (Clientul) - Consumer (Funcționarul).
+DeskWorker: Funcționarul de la ghișeu (Runnable). Rulează într-o buclă infinită, extrăgând tichete din coadă.
+Interacționează cu modulul de resurse pentru a suspenda activitatea în timpul pauzelor de cafea și pentru a prelua ștampila unică înainte de a finaliza un tichet.
+
+4. bureaucraticSystem.scheduler (Dispeceratul Central)
+Scheduler: Un dispecerat implementat ca Singleton (cu Double-Checked Locking).
+Automatizează dataflow-ul: primește un ServiceTicket de la client, interoghează DocumentRegistry pentru a identifica biroul corect și plasează tichetul în coada acelui birou în mod thread-safe.
+
+5. bureaucraticSystem.resource (Gestionarea Haosului și a Resurselor)
+OfficialStamp: O resursă partajată critică. Utilizează ReentrantLock(true) (fair lock) pentru a garanta accesul strict secvențial la ștampila instituției, prevenind fenomenul de starvation (ghișeele primesc ștampila în ordinea solicitării).
+CoffeeBreakScheduler: Introduce asincronism impredictibil.
+Un ScheduledExecutorService declanșează pauze de cafea la intervale prestabilite.
+Starea fiecărui ghișeu este monitorizată printr-un ConcurrentHashMap<String, AtomicBoolean>, forțând thread-urile ghișeelor să intre în așteptare (Thread.sleep) până la finalizarea pauzei.
+
+C. Modelul de Concurență
+Aplicația utilizează extensiv primitivele din pachetul java.util.concurrent:
+Sincronizare asincronă: CompletableFuture<Boolean> decuplează producătorul de consumator, permițând semnalizarea precisă a finalizării unui act.
+Cozi blocante: LinkedBlockingQueue pune automat ghișeele în starea WAITING dacă nu există clienți, evitând consumul de CPU.
+Colecții Thread-Safe: ConcurrentHashMap este utilizat global pentru registrele de documente, stările pauzelor de cafea și inventarul de acte (newKeySet()) deținut de fiecare client.
+Controlul Resurselor: ReentrantLock asigură excluderea mutuală pentru resursele fizice singulare (ștampila).
+Task-uri programate: ScheduledExecutorService rulează independent de thread-urile principale pentru a modifica stările de disponibilitate ale funcționarilor.
+
+D. Fluxul de Execuție (Workflow)
+Inițializare: Se încarcă configurația sistemului (actele, dependențele, cozile, planificatorul de pauze și ștampila unică).
+Pornire Ghișee: Thread-urile DeskWorker sunt activate și încep să asculte pe cozile lor blocante.
+Lansare Clienți: Zeci de thread-uri Client pornesc simultan. Un client utilizează RouteResolver pentru a afla că, pentru a obține un act final, îi lipsește un act de bază.
+Navigare și Așteptare: Clientul emite un ServiceTicket, pe care Scheduler-ul îl rutează către coada biroului emitent. Clientul se blochează asincron așteptând rezolvarea.
+Procesare la Ghișeu: Un DeskWorker preia tichetul. Dacă CoffeeBreakScheduler i-a setat starea de pauză, așteaptă. Când reîncepe munca, blochează OfficialStamp, simulează procesarea și apelează ticket.markCompleted().
+Completare: Clientul se deblochează, adaugă actul în colecția proprie și reia procesul de la pasul 3. Simularea se încheie curat când toți clienții ajung la actul final dorit.
