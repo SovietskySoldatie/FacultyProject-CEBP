@@ -12,6 +12,8 @@ import java.util.Set;
  * Rezolvitor singleton thread-safe pentru calculul lanțurilor de dependențe
  * între documente în cadrul sistemului birocratic.
  */
+
+//test test
 public class RouteResolver {
     private static volatile RouteResolver instance;
     private static final Object LOCK = new Object();
