@@ -4,6 +4,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+// baza de date a documentelor, pentru a putea fi accesate de către birouri și cetățeni
+
 public class DocumentRegistry {
     private final Map<String, Document> documents = new ConcurrentHashMap<>();
 
