@@ -12,8 +12,6 @@ import java.util.Set;
  * Rezolvitor singleton thread-safe pentru calculul lanțurilor de dependențe
  * între documente în cadrul sistemului birocratic.
  */
-
-//test test
 public class RouteResolver {
     private static volatile RouteResolver instance;
     private static final Object LOCK = new Object();
@@ -46,12 +44,15 @@ public class RouteResolver {
                 localInstance = instance;
                 if (localInstance == null) {
                     instance = localInstance = new RouteResolver(registry);
-                } else if (registry != null) {
-                    localInstance.registry = registry;
+                    return localInstance;
                 }
             }
-        } else if (registry != null && localInstance.registry != registry) {
-            localInstance.registry = registry;
+        }
+
+        if (registry != null && localInstance.registry != registry) {
+            synchronized (LOCK) {
+                localInstance.registry = registry;
+            }
         }
         return localInstance;
     }
@@ -74,16 +75,19 @@ public class RouteResolver {
     }
 
     /**
-     * Metodă statică de dataflow: determină primul document necesar folosind registrul din instanța Singleton.
+     * Metodă de instanță: determină primul document necesar folosind registrul
+     * configurat.
      */
-    public static Optional<Document> resolveNextRequiredDocument(Set<String> ownedDocs, String targetDocId) {
-        return getInstance().resolve(ownedDocs, targetDocId);
+    public Optional<Document> resolveNextRequiredDocument(Set<String> ownedDocs, String targetDocId) {
+        return resolve(ownedDocs, targetDocId);
     }
 
     /**
-     * Metodă statică de dataflow pur: determină primul document necesar pentru un DocumentRegistry specificat.
+     * Metodă statică de dataflow pur: determină primul document necesar pentru un
+     * DocumentRegistry specificat.
      */
-    public static Optional<Document> resolveNextRequiredDocument(DocumentRegistry registry, Set<String> ownedDocs, String targetDocId) {
+    public static Optional<Document> resolveNextRequiredDocument(DocumentRegistry registry, Set<String> ownedDocs,
+            String targetDocId) {
         return resolveRecursive(registry, ownedDocs, targetDocId, new HashSet<>());
     }
 
@@ -94,11 +98,14 @@ public class RouteResolver {
         return resolveRecursive(this.registry, ownedDocs, targetDocId, new HashSet<>());
     }
 
+    /**
+     * Metodă de rezolvare recursivă.
+     */
     private static Optional<Document> resolveRecursive(DocumentRegistry registry,
-                                                       Set<String> ownedDocs,
-                                                       String currentDocId,
-                                                       Set<String> visiting) {
-        if (registry == null) {
+            Set<String> ownedDocs,
+            String currentDocId,
+            Set<String> visiting) {
+        if (registry == null || currentDocId == null) {
             return Optional.empty();
         }
 
@@ -112,14 +119,17 @@ public class RouteResolver {
             throw new IllegalStateException("Dependență circulară detectată pentru actul: " + currentDocId);
         }
 
-        for (String reqId : target.getPrerequisites()) {
-            if (!ownedDocs.contains(reqId)) {
-                // Dacă precondiția are la rândul ei dependențe nesatisfăcute, coborâm recursiv
-                return resolveRecursive(registry, ownedDocs, reqId, visiting);
+        try {
+            Set<String> safeOwned = (ownedDocs != null) ? ownedDocs : Set.of();
+            for (String reqId : target.getPrerequisites()) {
+                if (!safeOwned.contains(reqId)) {
+                    // Dacă precondiția are la rândul ei dependențe nesatisfăcute, coborâm recursiv
+                    return resolveRecursive(registry, safeOwned, reqId, visiting);
+                }
             }
+            return Optional.of(target);
+        } finally {
+            visiting.remove(currentDocId);
         }
-
-        visiting.remove(currentDocId);
-        return Optional.of(target);
     }
 }
