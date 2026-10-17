@@ -32,14 +32,14 @@ public class OfficeQueue {
      * client.
      */
     public ServiceTicket takeTicket() throws InterruptedException {
-        return queue.take();
+        return queue.take(); // Operație blocantă thread-safe => WAITING
     }
 
     /**
      * Preia un tichet cu timp maxim de așteptare.
      */
     public ServiceTicket pollTicket(long timeout, TimeUnit unit) throws InterruptedException {
-        return queue.poll(timeout, unit);
+        return queue.poll(timeout, unit); // non-blocking, returnează null dacă nu există tichete
     }
 
     /**
