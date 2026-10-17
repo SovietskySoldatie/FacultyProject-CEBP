@@ -105,3 +105,4 @@ public class TestMember2Fault {
         System.out.println("\n=== Demonstrație finalizată cu succes ===");
     }
 }
+

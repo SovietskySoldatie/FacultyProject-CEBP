@@ -13,3 +13,4 @@ package bureaucraticSystem.counter;
 public class BlockingOfficeQueue extends OfficeQueue {
     // Moștenește implementarea corectă, robustă și sincronizată din clasa de bază OfficeQueue.
 }
+
