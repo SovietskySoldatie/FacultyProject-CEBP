@@ -4,59 +4,74 @@ import bureaucraticSystem.client.request.ServiceTicket;
 import bureaucraticSystem.resource.CoffeeBreakScheduler;
 import bureaucraticSystem.resource.OfficialStamp;
 
+import java.util.Objects;
+
 /**
- * Reprezintă un ghișeu individual dintr-un birou, care rulează pe propriul său
- * fir de execuție (Thread).
- * Extrage tichete din OfficeQueue și le rezolvă într-un mod simplu și direct.
+ * Reprezintă un ghișeu administrativ individual care rulează pe propriul său fir de execuție (Thread).
+ *
+ * Funcționează ca un Worker într-un Worker Pool:
+ *  - Extrage continuu tichete din OfficeQueue (operație blocantă takeTicket).
+ *  - Respectă întreruperile pentru pauza de cafea (CoffeeBreakScheduler).
+ *  - Solicită acces exclusiv la resursa partajată (OfficialStamp).
+ *  - Notifică asincron clientul când actul este eliberat (ticket.markCompleted()).
+ *  - Permite oprire curată (graceful shutdown) prin variabila volatile 'running' și semnal de întrerupere.
  */
 public class DeskWorker implements Runnable {
+
     private final String deskId;
     private final OfficeQueue queue;
-    private volatile boolean running = true;
-
-    //bia is here, sorry to disrupt peace
     private final CoffeeBreakScheduler breakScheduler;
     private final OfficialStamp stamp;
-    //
 
+    private volatile boolean running = true;
+
+    /**
+     * Constructor simplificat: util pentru teste izolate (fără pauză de cafea și ștampilă externă).
+     */
     public DeskWorker(String deskId, OfficeQueue queue) {
         this(deskId, queue, null, null);
     }
 
+    /**
+     * Constructor complet: integrează planificatorul de pauze și ștampila unică a instituției.
+     */
     public DeskWorker(String deskId, OfficeQueue queue, CoffeeBreakScheduler breakScheduler, OfficialStamp stamp) {
-        this.deskId = deskId;
-        this.queue = queue;
+        this.deskId = Objects.requireNonNull(deskId, "deskId nu poate fi null");
+        this.queue = Objects.requireNonNull(queue, "queue nu poate fi null");
         this.breakScheduler = breakScheduler;
         this.stamp = stamp;
     }
+
     /**
-     * Procesează cererea unui client:
-     * - simulează timpul de lucru al funcționarului (150ms)
-     * - marchează tichetul ca fiind finalizat cu succes
+     * Logica de procesare a unui tichet:
+     *  1. Verifică și așteaptă dacă ghișeul este în pauză de cafea.
+     *  2. Simulează timpul de lucru pentru redactarea documentului (150ms).
+     *  3. Preia și aplică ștampila unică a instituției (200ms).
+     *  4. Notifică clientul că documentul a fost eliberat cu succes.
      */
     protected void processTicket(ServiceTicket ticket) throws InterruptedException {
-        // Simulează redactarea și verificarea documentului
+        // Pasul 1: Dacă este programată pauza de cafea, ghișeul așteaptă finalizarea ei
         while (breakScheduler != null && breakScheduler.isOnBreak(deskId)) {
-            System.out.println(deskId + " așteaptă terminarea pauzei de cafea...");
+            System.out.println("☕ [" + deskId + "] este în pauză de cafea, cererea așteaptă...");
             Thread.sleep(300);
         }
 
-        // Simulează redactarea și verificarea documentului (cum era înainte)
+        // Pasul 2: Simulează redactarea și verificarea documentului
         Thread.sleep(150);
 
-        // 2. Folosește ștampila unică (să zicem 200ms)
+        // Pasul 3: Solicită acces exclusiv la ștampila oficială partajată
         if (stamp != null) {
             stamp.useStamp(deskId, 200);
         }
 
-        // Notifică clientul că actul este gata
+        // Pasul 4: Notifică clientul că actul este gata
         ticket.markCompleted();
     }
 
     /**
      * Oprește bucla de lucru a ghișeului.
-     * Variabila 'running' este volatile pentru a asigura vizibilitatea imediată
-     * între thread-uri.
+     * Variabila 'running' este volatile pentru a garanta vizibilitatea imediată
+     * a modificării între toate nucleele procesorului (JMM Memory Visibility).
      */
     public void stop() {
         this.running = false;
@@ -73,22 +88,28 @@ public class DeskWorker implements Runnable {
     @Override
     public void run() {
         System.out.println("Ghișeul " + deskId + " s-a deschis.");
+
         while (running && !Thread.currentThread().isInterrupted()) {
+            ServiceTicket ticket = null;
             try {
-                // 1. Așteaptă la coadă un tichet (operație blocantă thread-safe)
-                ServiceTicket ticket = queue.takeTicket();
+                // 1. Așteaptă blocant la coadă un tichet (fără consum CPU)
+                ticket = queue.takeTicket();
                 System.out.println(deskId + " a preluat clientul: " + ticket.getClientId());
 
-                // 2. Procesează direct tichetul
+                // 2. Procesează efectiv cererea
                 processTicket(ticket);
 
             } catch (InterruptedException e) {
-                // Dacă ghișeul este întrerupt în timp ce aștepta în coadă sau procesa actul,
-                // restaurăm fanionul de întrerupere și ieșim curat
+                // Dacă firul este întrerupt în timpul procesării, deblocăm clientul cu eșec
+                if (ticket != null) {
+                    ticket.markFailed();
+                }
+                // Restaurăm fanionul de întrerupere conform bunelor practici Java Concurrency
                 Thread.currentThread().interrupt();
                 break;
             }
         }
+
         System.out.println("Ghișeul " + deskId + " s-a închis.");
     }
 }
