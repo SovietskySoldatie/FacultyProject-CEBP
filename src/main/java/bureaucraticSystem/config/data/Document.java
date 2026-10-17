@@ -13,9 +13,22 @@ public class Document {
     private final String officeId;
     private final Set<String> prerequisites;
 
+    /**
+     * Constructor pentru documente fără precondiții (acte de bază).
+     */
+    public Document(String id, String officeId) {
+        this(id, officeId, Set.of());
+    }
+
     public Document(String id, String officeId, Set<String> prerequisites) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.officeId = Objects.requireNonNull(officeId, "officeId must not be null");
+        if (this.id.isBlank()) {
+            throw new IllegalArgumentException("id must not be blank");
+        }
+        if (this.officeId.isBlank()) {
+            throw new IllegalArgumentException("officeId must not be blank");
+        }
         this.prerequisites = (prerequisites == null) ? Set.of() : Set.copyOf(prerequisites);
     }
 
@@ -33,8 +46,10 @@ public class Document {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         Document document = (Document) o;
         return Objects.equals(id, document.id) &&
                 Objects.equals(officeId, document.officeId) &&
