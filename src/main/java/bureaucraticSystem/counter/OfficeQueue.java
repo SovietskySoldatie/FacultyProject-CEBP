@@ -26,6 +26,8 @@ public class OfficeQueue {
         queue.put(ticket);
     }
 
+    cbqkcbqbcvvvc
+
     /**
      * Preia primul tichet din coadă (operație executată de ghișeu).
      * Dacă coada este goală, firul de execuție se blochează până când sosește un
