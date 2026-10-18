@@ -134,6 +134,7 @@ public class Client implements Runnable {
     }
 
     public void stop() {
+        this.running = false;
         ServiceTicket ticket = this.currentTicket;
         if (ticket != null) {
             ticket.markFailed();
@@ -142,11 +143,22 @@ public class Client implements Runnable {
         if (thread != null && thread != Thread.currentThread()) {
             thread.interrupt();
         }
-        this.running = false;
     }
 
     public boolean isRunning() {
         return running;
+    }
+
+    public Scheduler getScheduler() {
+        return scheduler;
+    }
+
+    public RouteResolver getRouteResolver() {
+        return routeResolver;
+    }
+
+    public ServiceTicket getCurrentTicket() {
+        return currentTicket;
     }
 
     /**
@@ -169,7 +181,7 @@ public class Client implements Runnable {
                 this.runnerThread = Thread.currentThread();
             }
 
-            ServiceTicket ticket = new ServiceTicket(clientId, documentId);
+            ServiceTicket ticket = new ServiceTicket(this, documentId);
             this.currentTicket = ticket;
             try {
                 dispatcher.dispatch(ticket);
@@ -226,6 +238,63 @@ public class Client implements Runnable {
         return executeTicketRequest(documentId, t -> scheduler.dispatchTicketInternal(t, officeId));
     }
 
+    /**
+     * Trimite un tichet prin Scheduler fără a specifica biroul (alocare automată pe baza registrului de documente).
+     */
+    public boolean requestDocument(Scheduler scheduler, String documentId) throws Exception {
+        if (scheduler == null) {
+            throw new IllegalArgumentException("Scheduler cannot be null");
+        }
+        if (documentId == null) {
+            throw new IllegalArgumentException("documentId cannot be null");
+        }
+        return executeTicketRequest(documentId, scheduler::dispatchTicketInternal);
+    }
+
+    /**
+     * Solicită obținerea unui document folosind infrastructura configurată a clientului (Scheduler sau coadă).
+     */
+    public boolean requestDocument(String documentId) throws Exception {
+        if (documentId == null) {
+            throw new IllegalArgumentException("documentId cannot be null");
+        }
+        if (scheduler != null) {
+            return requestDocument(scheduler, documentId);
+        } else if (officeQueueResolver != null) {
+            OfficeQueue queue = officeQueueResolver.apply(null);
+            if (queue == null) {
+                throw new IllegalStateException("Nu există o coadă disponibilă pentru clientul " + clientId);
+            }
+            return requestDocument(queue, documentId);
+        } else {
+            throw new IllegalStateException("Niciun scheduler sau coadă configurată pentru clientul " + clientId);
+        }
+    }
+
+    /**
+     * Solicită obținerea unui document la un anumit birou folosind infrastructura configurată.
+     */
+    public boolean requestDocument(String documentId, String officeId) throws Exception {
+        if (documentId == null) {
+            throw new IllegalArgumentException("documentId cannot be null");
+        }
+        if (scheduler != null) {
+            if (officeId != null) {
+                return requestDocument(scheduler, documentId, officeId);
+            } else {
+                return requestDocument(scheduler, documentId);
+            }
+        } else if (officeQueueResolver != null) {
+            OfficeQueue queue = officeQueueResolver.apply(officeId);
+            if (queue == null) {
+                throw new IllegalStateException("Nu există o coadă disponibilă pentru biroul " + officeId);
+            }
+            return requestDocument(queue, documentId);
+        } else {
+            throw new IllegalStateException("Niciun scheduler sau coadă configurată pentru clientul " + clientId);
+        }
+    }
+
     @Override
     public void run() {
         this.runnerThread = Thread.currentThread();
@@ -252,8 +321,13 @@ public class Client implements Runnable {
 
                         if (scheduler != null) {
                             // Clientul obține tichetul, iar alocarea la birou este făcută de Scheduler
-                            System.out.println("[" + clientId + "] Trimite tichetul pentru " + nextDoc.getId() + " prin Scheduler către biroul " + nextDoc.getOfficeId());
-                            success = requestDocument(scheduler, nextDoc.getId(), nextDoc.getOfficeId());
+                            if (nextDoc.getOfficeId() != null) {
+                                System.out.println("[" + clientId + "] Trimite tichetul pentru " + nextDoc.getId() + " prin Scheduler către biroul " + nextDoc.getOfficeId());
+                                success = requestDocument(scheduler, nextDoc.getId(), nextDoc.getOfficeId());
+                            } else {
+                                System.out.println("[" + clientId + "] Trimite tichetul pentru " + nextDoc.getId() + " prin Scheduler (alocare automată)");
+                                success = requestDocument(scheduler, nextDoc.getId());
+                            }
                         } else if (officeQueueResolver != null) {
                             OfficeQueue queue = officeQueueResolver.apply(nextDoc.getOfficeId());
                             if (queue == null) {

@@ -1,5 +1,7 @@
 package bureaucraticSystem.client.request;
 
+import bureaucraticSystem.client.Client;
+
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -8,7 +10,7 @@ import java.util.concurrent.TimeUnit;
  * Tichetul de schimb: clientul îl depune în coadă, ghișeul îl procesează.
  * Ascunde detaliile tehnice de semnalizare în spatele unor metode simple:
  *  - markCompleted() folosit de ghișeu când termină actul
- *  - markFailed() folosit de ghișeu când cererea eșuează
+ *  - markFailed() folosit de ghișeu când cererea eșuează sau de scheduler/client la oprire
  *  - waitForCompletion() folosit de client când așteaptă la rând
  */
 public class ServiceTicket {
@@ -26,6 +28,17 @@ public class ServiceTicket {
         this(clientId, documentId, new CompletableFuture<>());
     }
 
+    /**
+     * Constructor convenabil când se deține instanța directă a Clientului.
+     */
+    public ServiceTicket(Client client, String documentId) {
+        this(Objects.requireNonNull(client, "client must not be null").getClientId(), documentId);
+    }
+
+    public ServiceTicket(Client client, String documentId, CompletableFuture<Boolean> completionSignal) {
+        this(Objects.requireNonNull(client, "client must not be null").getClientId(), documentId, completionSignal);
+    }
+
     public String getClientId() {
         return clientId;
     }
@@ -40,20 +53,39 @@ public class ServiceTicket {
 
     /**
      * Anunță că tichetul a fost rezolvat cu succes de către ghișeu.
+     * Returnează true dacă apelul a realizat tranziția în starea completată.
      */
-    public void markCompleted() {
-        if (completionSignal != null) {
-            completionSignal.complete(true);
-        }
+    public boolean markCompleted() {
+        return completionSignal != null && completionSignal.complete(true);
     }
 
     /**
-     * Anunță că cererea a eșuat sau a fost întreruptă.
+     * Anunță că cererea a eșuat sau a fost întreruptă/anulată.
+     * Returnează true dacă apelul a realizat tranziția în starea eșuată.
      */
-    public void markFailed() {
-        if (completionSignal != null) {
-            completionSignal.complete(false);
-        }
+    public boolean markFailed() {
+        return completionSignal != null && completionSignal.complete(false);
+    }
+
+    /**
+     * Indică dacă tichetul a fost soluționat (cu succes sau eșec).
+     */
+    public boolean isDone() {
+        return completionSignal != null && completionSignal.isDone();
+    }
+
+    /**
+     * Indică dacă tichetul s-a finalizat cu succes.
+     */
+    public boolean isCompletedSuccessfully() {
+        return isDone() && Boolean.TRUE.equals(completionSignal.getNow(false));
+    }
+
+    /**
+     * Indică dacă tichetul a fost marcat ca eșuat sau a fost anulat.
+     */
+    public boolean isFailed() {
+        return isDone() && Boolean.FALSE.equals(completionSignal.getNow(true));
     }
 
     /**

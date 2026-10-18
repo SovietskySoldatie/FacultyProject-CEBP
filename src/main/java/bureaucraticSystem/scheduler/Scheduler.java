@@ -1,5 +1,6 @@
 package bureaucraticSystem.scheduler;
 
+import bureaucraticSystem.client.Client;
 import bureaucraticSystem.client.request.ServiceTicket;
 import bureaucraticSystem.config.data.Document;
 import bureaucraticSystem.config.data.DocumentRegistry;
@@ -178,14 +179,32 @@ public class Scheduler {
      * @param officeId ID-ul biroului la care este alocat tichetul
      */
     public static void dispatchTicket(ServiceTicket ticket, String officeId) throws InterruptedException {
-        getInstance().dispatchTicketInternal(ticket, officeId);
+        Objects.requireNonNull(ticket, "ticket must not be null");
+        try {
+            getInstance().dispatchTicketInternal(ticket, officeId);
+        } catch (InterruptedException e) {
+            ticket.markFailed();
+            throw e;
+        } catch (Exception e) {
+            ticket.markFailed();
+            throw e;
+        }
     }
 
     /**
      * Metodă statică de dataflow: Alocare automată pe baza registrului de documente.
      */
     public static void dispatchTicket(ServiceTicket ticket) throws InterruptedException {
-        getInstance().dispatchTicketInternal(ticket);
+        Objects.requireNonNull(ticket, "ticket must not be null");
+        try {
+            getInstance().dispatchTicketInternal(ticket);
+        } catch (InterruptedException e) {
+            ticket.markFailed();
+            throw e;
+        } catch (Exception e) {
+            ticket.markFailed();
+            throw e;
+        }
     }
 
     /**
@@ -200,6 +219,10 @@ public class Scheduler {
             throw new IllegalStateException("Scheduler is stopped.");
         }
 
+        if (ticket.isDone()) {
+            return;
+        }
+
         OfficeQueue queue = officeQueues.get(officeId);
         if (queue == null) {
             ticket.markFailed();
@@ -209,6 +232,9 @@ public class Scheduler {
         // Alocă tichetul către coada biroului în mod thread-safe
         try {
             queue.addTicket(ticket);
+            if (!running) {
+                ticket.markFailed();
+            }
         } catch (InterruptedException e) {
             ticket.markFailed();
             throw e;
@@ -224,7 +250,17 @@ public class Scheduler {
     public void dispatchTicketInternal(ServiceTicket ticket) throws InterruptedException {
         Objects.requireNonNull(ticket, "ticket must not be null");
 
+        if (!running) {
+            ticket.markFailed();
+            throw new IllegalStateException("Scheduler is stopped.");
+        }
+
+        if (ticket.isDone()) {
+            return;
+        }
+
         if (documentRegistry == null) {
+            ticket.markFailed();
             throw new IllegalStateException("DocumentRegistry nu a fost configurat în Scheduler!");
         }
 
@@ -240,6 +276,22 @@ public class Scheduler {
         }
 
         dispatchTicketInternal(ticket, doc.getOfficeId());
+    }
+
+    /**
+     * Înregistrează și trimite o cerere în numele unui client către biroul specificat.
+     */
+    public boolean scheduleClient(Client client, String documentId, String officeId) throws Exception {
+        Objects.requireNonNull(client, "client must not be null");
+        return client.requestDocument(this, documentId, officeId);
+    }
+
+    /**
+     * Înregistrează și trimite o cerere în numele unui client, determinând biroul automat.
+     */
+    public boolean scheduleClient(Client client, String documentId) throws Exception {
+        Objects.requireNonNull(client, "client must not be null");
+        return client.requestDocument(this, documentId);
     }
 
     public void stop() {
