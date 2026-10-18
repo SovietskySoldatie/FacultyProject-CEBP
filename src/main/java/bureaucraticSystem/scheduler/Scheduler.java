@@ -7,7 +7,11 @@ import bureaucraticSystem.counter.OfficeQueue;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Gestionează alocarea thread-safe a cererilor (ServiceTicket) către birouri
@@ -15,7 +19,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class Scheduler {
     private static volatile Scheduler instance;
+    private static volatile CompletableFuture<Scheduler> instanceFuture = new CompletableFuture<>();
     private static final Object LOCK = new Object();
+    private static volatile boolean wasReset = false;
 
     private final Map<String, OfficeQueue> officeQueues;
     private final DocumentRegistry documentRegistry;
@@ -37,37 +43,91 @@ public class Scheduler {
     }
 
     /**
-     * Returnează instanța unică (Singleton) a Scheduler-ului folosind Double-Checked Locking thread-safe.
+     * Returnează instanța unică (Singleton) a Scheduler-ului.
+     * Dacă Scheduler-ul nu a fost încă inițializat, firul apelant este pus în așteptare
+     * până când un alt fir inițializează instanța cu un DocumentRegistry valid.
      */
     public static Scheduler getInstance() {
-        return getInstance(null);
+        return getInstance((DocumentRegistry) null);
     }
 
     /**
      * Returnează sau inițializează instanța unică cu un DocumentRegistry specificat.
+     * - Dacă documentRegistry == null: verifică dacă instanța a fost resetată (eșuează imediat)
+     *   sau blochează firul apelant pur determinist până la inițializare.
+     * - Dacă documentRegistry != null: blochează pe LOCK până când instanța este creată și
+     *   emite evenimentul prin CompletableFuture (instanceFuture.complete), deblocând toate firele în așteptare.
      */
     public static Scheduler getInstance(DocumentRegistry documentRegistry) {
         Scheduler localInstance = instance;
-        if (localInstance == null) {
-            synchronized (LOCK) {
-                localInstance = instance;
-                if (localInstance == null) {
-                    instance = localInstance = new Scheduler(documentRegistry);
-                }
+        if (localInstance != null) {
+            return localInstance;
+        }
+
+        if (documentRegistry == null) {
+            if (wasReset) {
+                throw new IllegalStateException("Scheduler-ul a fost resetat / oprit și nu mai acceptă cereri.");
+            }
+            try {
+                return instanceFuture.get();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Firul a fost întrerupt în timp ce aștepta inițializarea Scheduler-ului.", e);
+            } catch (ExecutionException e) {
+                Throwable cause = e.getCause();
+                String message = cause != null ? cause.getMessage() : e.getMessage();
+                throw new IllegalStateException("Așteptarea inițializării a eșuat: " + message, e);
             }
         }
-        return localInstance;
+
+        synchronized (LOCK) {
+            localInstance = instance;
+            if (localInstance == null) {
+                localInstance = new Scheduler(documentRegistry);
+                instance = localInstance;
+                wasReset = false;
+                if (instanceFuture.isDone()) {
+                    instanceFuture = new CompletableFuture<>();
+                }
+                instanceFuture.complete(localInstance);
+            }
+            return localInstance;
+        }
+    }
+
+    /**
+     * Returnează instanța unică sau așteaptă un timp maxim specificat inițializarea acesteia.
+     */
+    public static Scheduler getInstance(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+        Scheduler localInstance = instance;
+        if (localInstance != null) {
+            return localInstance;
+        }
+        return instanceFuture.get(timeout, unit);
+    }
+
+    /**
+     * Returnează semnalul CompletableFuture asociat inițializării Scheduler-ului.
+     */
+    public static CompletableFuture<Scheduler> getInstanceFuture() {
+        return instanceFuture;
     }
 
     /**
      * Reinițializează instanța Singleton (util pentru Unit Tests / scenarii de testare repetate).
+     * Transmite determinist un semnal de excepție către toate firele care așteaptă inițializarea.
      */
     public static void resetInstance() {
         synchronized (LOCK) {
             if (instance != null) {
                 instance.stop();
             }
+            wasReset = true;
+            if (!instanceFuture.isDone()) {
+                instanceFuture.completeExceptionally(new IllegalStateException("Scheduler-ul a fost resetat / oprit."));
+            }
             instance = null;
+            instanceFuture = new CompletableFuture<>();
         }
     }
 
@@ -82,15 +142,32 @@ public class Scheduler {
 
     /**
      * Elimină un birou din scheduler (de ex. la închidere).
+     * Eliberează și marchează ca eșuate eventualele tichete rămase în coadă.
      */
     public void unregisterOffice(String officeId) {
-        officeQueues.remove(officeId);
+        if (officeId == null) {
+            return;
+        }
+        OfficeQueue removedQueue = officeQueues.remove(officeId);
+        if (removedQueue != null) {
+            try {
+                ServiceTicket t;
+                while ((t = removedQueue.pollTicket(0, TimeUnit.MILLISECONDS)) != null) {
+                    t.markFailed();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     /**
      * Returnează coada asociată unui birou.
      */
     public OfficeQueue getOfficeQueue(String officeId) {
+        if (officeId == null) {
+            return null;
+        }
         return officeQueues.get(officeId);
     }
 
@@ -130,7 +207,15 @@ public class Scheduler {
         }
 
         // Alocă tichetul către coada biroului în mod thread-safe
-        queue.addTicket(ticket);
+        try {
+            queue.addTicket(ticket);
+        } catch (InterruptedException e) {
+            ticket.markFailed();
+            throw e;
+        } catch (Exception e) {
+            ticket.markFailed();
+            throw e;
+        }
     }
 
     /**
@@ -149,11 +234,27 @@ public class Scheduler {
             throw new IllegalArgumentException("Document necunoscut: " + ticket.getDocumentId());
         }
 
+        if (doc.getOfficeId() == null) {
+            ticket.markFailed();
+            throw new IllegalArgumentException("Documentul " + ticket.getDocumentId() + " nu are un birou asociat!");
+        }
+
         dispatchTicketInternal(ticket, doc.getOfficeId());
     }
 
     public void stop() {
         this.running = false;
+        for (OfficeQueue queue : officeQueues.values()) {
+            try {
+                ServiceTicket t;
+                while ((t = queue.pollTicket(0, TimeUnit.MILLISECONDS)) != null) {
+                    t.markFailed();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
     }
 
     public boolean isRunning() {
