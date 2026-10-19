@@ -24,6 +24,7 @@ public class DeskWorker implements Runnable {
     private final OfficialStamp stamp;
 
     private volatile boolean running = true;
+    private volatile Thread workerThread;
 
     /**
      * Constructor simplificat: util pentru teste izolate (fără pauză de cafea și ștampilă externă).
@@ -69,12 +70,17 @@ public class DeskWorker implements Runnable {
     }
 
     /**
-     * Oprește bucla de lucru a ghișeului.
+     * Oprește bucla de lucru a ghișeului și trezește imediat firul de execuție
+     * dacă acesta este blocat în așteptare la coadă (queue.takeTicket()).
      * Variabila 'running' este volatile pentru a garanta vizibilitatea imediată
      * a modificării între toate nucleele procesorului (JMM Memory Visibility).
      */
     public void stop() {
         this.running = false;
+        Thread thread = this.workerThread;
+        if (thread != null) {
+            thread.interrupt();
+        }
     }
 
     public boolean isRunning() {
@@ -87,29 +93,33 @@ public class DeskWorker implements Runnable {
 
     @Override
     public void run() {
+        this.workerThread = Thread.currentThread();
         System.out.println("Ghișeul " + deskId + " s-a deschis.");
 
-        while (running && !Thread.currentThread().isInterrupted()) {
-            ServiceTicket ticket = null;
-            try {
-                // 1. Așteaptă blocant la coadă un tichet (fără consum CPU)
-                ticket = queue.takeTicket();
-                System.out.println(deskId + " a preluat clientul: " + ticket.getClientId());
+        try {
+            while (running && !Thread.currentThread().isInterrupted()) {
+                ServiceTicket ticket = null;
+                try {
+                    // 1. Așteaptă blocant la coadă un tichet (fără consum CPU)
+                    ticket = queue.takeTicket();
+                    System.out.println(deskId + " a preluat clientul: " + ticket.getClientId());
 
-                // 2. Procesează efectiv cererea
-                processTicket(ticket);
+                    // 2. Procesează efectiv cererea
+                    processTicket(ticket);
 
-            } catch (InterruptedException e) {
-                // Dacă firul este întrerupt în timpul procesării, deblocăm clientul cu eșec
-                if (ticket != null) {
-                    ticket.markFailed();
+                } catch (InterruptedException e) {
+                    // Dacă firul este întrerupt în timpul procesării, deblocăm clientul cu eșec
+                    if (ticket != null) {
+                        ticket.markFailed();
+                    }
+                    // Restaurăm fanionul de întrerupere conform bunelor practici Java Concurrency
+                    Thread.currentThread().interrupt();
+                    break;
                 }
-                // Restaurăm fanionul de întrerupere conform bunelor practici Java Concurrency
-                Thread.currentThread().interrupt();
-                break;
             }
+        } finally {
+            this.workerThread = null;
+            System.out.println("Ghișeul " + deskId + " s-a închis.");
         }
-
-        System.out.println("Ghișeul " + deskId + " s-a închis.");
     }
 }
