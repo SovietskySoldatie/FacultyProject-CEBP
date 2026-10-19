@@ -3,6 +3,7 @@ package bureaucraticSystem.counter;
 import bureaucraticSystem.client.request.ServiceTicket;
 import bureaucraticSystem.resource.CoffeeBreakScheduler;
 import bureaucraticSystem.resource.OfficialStamp;
+import bureaucraticSystem.resource.SafeStamp;
 
 /**
  * Reprezintă un ghișeu individual dintr-un birou, care rulează pe propriul său
@@ -23,7 +24,7 @@ public class DeskWorker implements Runnable {
         this(deskId, queue, null, null);
     }
 
-    public DeskWorker(String deskId, OfficeQueue queue, CoffeeBreakScheduler breakScheduler, OfficialStamp stamp) {
+    public DeskWorker(String deskId, OfficeQueue queue, CoffeeBreakScheduler breakScheduler, SafeStamp stamp) {
         this.deskId = deskId;
         this.queue = queue;
         this.breakScheduler = breakScheduler;

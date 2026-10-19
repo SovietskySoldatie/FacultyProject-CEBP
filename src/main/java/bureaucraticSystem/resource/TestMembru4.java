@@ -7,7 +7,7 @@ import bureaucraticSystem.counter.OfficeQueue;
 
 public class TestMembru4 {
     public static void main(String[] args) throws Exception {
-        OfficialStamp stamp = new OfficialStamp();
+        SafeStamp stamp = new SafeStamp();
         CoffeeBreakScheduler scheduler = new CoffeeBreakScheduler();
         OfficeQueue queue = new OfficeQueue();
 

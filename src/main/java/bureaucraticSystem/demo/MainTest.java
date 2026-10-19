@@ -8,7 +8,7 @@ import bureaucraticSystem.counter.DeskWorker;
 import bureaucraticSystem.counter.OfficeQueue;
 import bureaucraticSystem.scheduler.Scheduler;
 import bureaucraticSystem.resource.CoffeeBreakScheduler;
-import bureaucraticSystem.resource.OfficialStamp;
+import bureaucraticSystem.resource.SafeStamp;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -50,7 +50,7 @@ public class MainTest {
         // ---------------------------------------------------------
         // 3. RESURSE ȘI HAOS (Membrul 4 - Partea ta)
         // ---------------------------------------------------------
-        OfficialStamp stamp = new OfficialStamp(); // O singură ștampilă pentru toată instituția!
+        SafeStamp stamp = new SafeStamp(); // O singură ștampilă pentru toată instituția!
         CoffeeBreakScheduler breakScheduler = new CoffeeBreakScheduler();
 
         breakScheduler.registerDesk("Desk-StareaCivila");

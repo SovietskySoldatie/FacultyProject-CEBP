@@ -1,0 +1,8 @@
+package bureaucraticSystem.resource;
+
+public interface DocumentCounter {
+    void acquireCounter();
+    void releaseCounter();
+    boolean tryAcquireCounter(long timeoutMs) throws InterruptedException;
+    void increment(String deskId);
+}
