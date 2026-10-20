@@ -12,15 +12,20 @@ public class Document {
     private final String id;
     private final String officeId;
     private final Set<String> prerequisites;
+    private final int intID;
 
     /**
      * Constructor pentru documente fără precondiții (acte de bază).
      */
     public Document(String id, String officeId) {
-        this(id, officeId, Set.of());
+        this(id, officeId, Set.of(), 0);
     }
 
     public Document(String id, String officeId, Set<String> prerequisites) {
+        this(id, officeId, prerequisites, 0);
+    }
+
+    public Document(String id, String officeId, Set<String> prerequisites, int intID) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.officeId = Objects.requireNonNull(officeId, "officeId must not be null");
         if (this.id.isBlank()) {
@@ -30,6 +35,7 @@ public class Document {
             throw new IllegalArgumentException("officeId must not be blank");
         }
         this.prerequisites = (prerequisites == null) ? Set.of() : Set.copyOf(prerequisites);
+        this.intID = intID;
     }
 
     public String getId() {
@@ -44,6 +50,10 @@ public class Document {
         return prerequisites;
     }
 
+    public int getIntID() {
+        return intID;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o)
@@ -51,14 +61,15 @@ public class Document {
         if (o == null || getClass() != o.getClass())
             return false;
         Document document = (Document) o;
-        return Objects.equals(id, document.id) &&
+        return intID == document.intID &&
+                Objects.equals(id, document.id) &&
                 Objects.equals(officeId, document.officeId) &&
                 Objects.equals(prerequisites, document.prerequisites);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, officeId, prerequisites);
+        return Objects.hash(id, officeId, prerequisites, intID);
     }
 
     @Override
@@ -67,6 +78,7 @@ public class Document {
                 "id='" + id + '\'' +
                 ", officeId='" + officeId + '\'' +
                 ", prerequisites=" + prerequisites +
+                ", intID=" + intID +
                 '}';
     }
 }

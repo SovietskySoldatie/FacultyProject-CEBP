@@ -18,8 +18,24 @@ public class SafeCounter implements DocumentCounter {
     }
 
     @Override
-    public void increment(String deskId) {
-        count++;
-        System.out.println("Safe Counter: " + deskId + " registered. Total office: " + count);
+    public int increment(String deskId) {
+        lock.lock();
+        try {
+            count++;
+            System.out.println("Safe Counter: " + deskId + " registered. Total office: " + count);
+            return count;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public int getCount() {
+        lock.lock();
+        try {
+            return count;
+        } finally {
+            lock.unlock();
+        }
     }
 }

@@ -1,6 +1,7 @@
 package bureaucraticSystem.client.request;
 
 import bureaucraticSystem.client.Client;
+import bureaucraticSystem.config.data.Document;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -17,6 +18,7 @@ public class ServiceTicket {
     private final String clientId;
     private final String documentId;
     private final CompletableFuture<Boolean> completionSignal;
+    private volatile Document issuedDocument;
 
     public ServiceTicket(String clientId, String documentId, CompletableFuture<Boolean> completionSignal) {
         this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
@@ -49,6 +51,14 @@ public class ServiceTicket {
 
     public CompletableFuture<Boolean> getCompletionSignal() {
         return completionSignal;
+    }
+
+    public Document getIssuedDocument() {
+        return issuedDocument;
+    }
+
+    public void setIssuedDocument(Document issuedDocument) {
+        this.issuedDocument = issuedDocument;
     }
 
     /**

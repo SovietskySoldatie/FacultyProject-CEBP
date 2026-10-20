@@ -1,11 +1,13 @@
 package bureaucraticSystem.counter;
 
 import bureaucraticSystem.client.request.ServiceTicket;
+import bureaucraticSystem.config.data.Document;
 import bureaucraticSystem.resource.CoffeeBreakScheduler;
 import bureaucraticSystem.resource.DocumentCounter;
 import bureaucraticSystem.resource.OfficialStamp;
 
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Reprezintă un ghișeu administrativ individual care rulează pe propriul său fir de execuție (Thread).
@@ -102,9 +104,10 @@ public class DeskWorker implements Runnable {
         // Pasul 2: Simulează redactarea și verificarea documentului
         Thread.sleep(DRAFTING_DURATION_MS);
 
+        int intId = 0;
         // Pasul 3: Utilizarea resurselor partajate (OfficialStamp & DocumentCounter)
         if (stamp != null && documentCounter != null) {
-            acquireBothResourcesAndProcess();
+            intId = acquireBothResourcesAndProcess();
         } else if (stamp != null) {
             stamp.acquireStamp();
             try {
@@ -115,13 +118,15 @@ public class DeskWorker implements Runnable {
         } else if (documentCounter != null) {
             documentCounter.acquireCounter();
             try {
-                documentCounter.increment(deskId);
+                intId = documentCounter.increment(deskId);
             } finally {
                 documentCounter.releaseCounter();
             }
         }
 
-        // Pasul 4: Notifică clientul că actul este gata
+        // Pasul 4: Creează documentul cu intID și notifică clientul că actul este gata
+        Document issuedDoc = new Document(ticket.getDocumentId(), deskId, Set.of(), intId);
+        ticket.setIssuedDocument(issuedDoc);
         ticket.markCompleted();
     }
 
@@ -132,8 +137,9 @@ public class DeskWorker implements Runnable {
      *  - Cu UnsafeStamp + UnsafeCounter: tryAcquire apelează lock.lock() blocant, ceea ce duce la
      *    Circular Wait Deadlock când două ghișee au ordine opusă (stampFirst = true vs false).
      */
-    private void acquireBothResourcesAndProcess() throws InterruptedException {
+    private int acquireBothResourcesAndProcess() throws InterruptedException {
         boolean resourcesAcquired = false;
+        int issuedId = 0;
         while (!resourcesAcquired && running && !Thread.currentThread().isInterrupted()) {
             if (stampFirst) {
                 stamp.acquireStamp();
@@ -141,7 +147,7 @@ public class DeskWorker implements Runnable {
                     stamp.simulateUsage(deskId, STAMP_DURATION_MS);
                     if (documentCounter.tryAcquireCounter(RESOURCE_TRY_LOCK_TIMEOUT_MS)) {
                         try {
-                            documentCounter.increment(deskId);
+                            issuedId = documentCounter.increment(deskId);
                             resourcesAcquired = true;
                         } finally {
                             documentCounter.releaseCounter();
@@ -159,7 +165,7 @@ public class DeskWorker implements Runnable {
                     if (stamp.tryAcquireStamp(RESOURCE_TRY_LOCK_TIMEOUT_MS)) {
                         try {
                             stamp.simulateUsage(deskId, STAMP_DURATION_MS);
-                            documentCounter.increment(deskId);
+                            issuedId = documentCounter.increment(deskId);
                             resourcesAcquired = true;
                         } finally {
                             stamp.releaseStamp();
@@ -176,6 +182,7 @@ public class DeskWorker implements Runnable {
                 Thread.sleep(RESOURCE_RETRY_BACKOFF_MS);
             }
         }
+        return issuedId;
     }
 
     /**
