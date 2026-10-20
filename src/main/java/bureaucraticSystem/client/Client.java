@@ -4,7 +4,7 @@ import bureaucraticSystem.client.request.ServiceTicket;
 import bureaucraticSystem.config.data.Document;
 import bureaucraticSystem.config.graph.RouteResolver;
 import bureaucraticSystem.counter.OfficeQueue;
-import bureaucraticSystem.scheduler.Scheduler;
+import bureaucraticSystem.scheduler.TicketDispatcher;
 
 import java.util.Collections;
 import java.util.Map;
@@ -27,7 +27,7 @@ public class Client implements Runnable {
     private final Set<Document> ownedDocuments; // assigned to ConcurrentHashMap.newKeySet
     private final Map<String, Document> receivedDocuments = new ConcurrentHashMap<>();
     private final RouteResolver routeResolver;
-    private final Scheduler scheduler;
+    private final TicketDispatcher scheduler;
     private final Function<String, OfficeQueue> officeQueueResolver;
     private volatile boolean running = true;
     private volatile boolean completed = false;
@@ -41,7 +41,7 @@ public class Client implements Runnable {
     public Client(String clientId,
                   String targetDocumentId,
                   RouteResolver routeResolver,
-                  Scheduler scheduler,
+                  TicketDispatcher scheduler,
                   Set<Document> initialOwnedDocs) {
         this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
         this.targetDocumentId = Objects.requireNonNull(targetDocumentId, "targetDocumentId must not be null");
@@ -57,7 +57,7 @@ public class Client implements Runnable {
     public Client(String clientId,
                   String targetDocumentId,
                   RouteResolver routeResolver,
-                  Scheduler scheduler) {
+                  TicketDispatcher scheduler) {
         this(clientId, targetDocumentId, routeResolver, scheduler, Collections.emptySet());
     }
 
@@ -66,7 +66,7 @@ public class Client implements Runnable {
      */
     public Client(String clientId,
                   String targetDocumentId,
-                  Scheduler scheduler) {
+                  TicketDispatcher scheduler) {
         this(clientId, targetDocumentId, RouteResolver.getInstance(), scheduler, Collections.emptySet());
     }
 
@@ -163,7 +163,7 @@ public class Client implements Runnable {
     }
 
     @FunctionalInterface
-    private interface TicketDispatcher {
+    private interface TicketSubmitter {
         void dispatch(ServiceTicket ticket) throws Exception;
     }
 
@@ -183,7 +183,7 @@ public class Client implements Runnable {
         return running;
     }
 
-    public Scheduler getScheduler() {
+    public TicketDispatcher getScheduler() {
         return scheduler;
     }
 
@@ -200,7 +200,7 @@ public class Client implements Runnable {
      * Asigură execuția serializată per client, propagarea semnalului de stop()
      * și curățarea oricăror tichete active în caz de eroare sau întrerupere.
      */
-    private boolean executeTicketRequest(String documentId, TicketDispatcher dispatcher) throws Exception {
+    private boolean executeTicketRequest(String documentId, TicketSubmitter dispatcher) throws Exception {
         if (!running || Thread.currentThread().isInterrupted()) {
             return false;
         }
@@ -267,7 +267,7 @@ public class Client implements Runnable {
     /**
      * Trimite un tichet prin Scheduler (care se ocupă de alocarea la birou) și așteaptă finalizarea în mod thread-safe.
      */
-    public boolean requestDocument(Scheduler scheduler, String documentId, String officeId) throws Exception {
+    public boolean requestDocument(TicketDispatcher scheduler, String documentId, String officeId) throws Exception {
         if (scheduler == null) {
             throw new IllegalArgumentException("Scheduler cannot be null");
         }
@@ -277,20 +277,20 @@ public class Client implements Runnable {
         if (officeId == null) {
             throw new IllegalArgumentException("officeId cannot be null");
         }
-        return executeTicketRequest(documentId, t -> scheduler.dispatchTicketInternal(t, officeId));
+        return executeTicketRequest(documentId, t -> scheduler.dispatch(t, officeId));
     }
 
     /**
      * Trimite un tichet prin Scheduler fără a specifica biroul (alocare automată pe baza registrului de documente).
      */
-    public boolean requestDocument(Scheduler scheduler, String documentId) throws Exception {
+    public boolean requestDocument(TicketDispatcher scheduler, String documentId) throws Exception {
         if (scheduler == null) {
             throw new IllegalArgumentException("Scheduler cannot be null");
         }
         if (documentId == null) {
             throw new IllegalArgumentException("documentId cannot be null");
         }
-        return executeTicketRequest(documentId, scheduler::dispatchTicketInternal);
+        return executeTicketRequest(documentId, scheduler::dispatch);
     }
 
     /**
