@@ -24,39 +24,28 @@ The system is organized into 5 modular layers communicating via thread-safe abst
 ```mermaid
 flowchart TD
     subgraph ClientLayer["1. Client Layer (Concurrent Citizen Threads)"]
-        C1["Citizen 1 (Thread)"]
-        C2["Citizen 2 (Thread)"]
-        C3["Citizen N (Thread)"]
+        C1["Citizen 1..N (50% target Pasaport)"]
+        C2["Citizen N+1..2N (50% target PUZ)"]
     end
 
-    subgraph RoutingLayer["2. Routing & Knowledge Layer (DAG)"]
+    subgraph RoutingLayer["2. Routing & Knowledge Layer (4-Tier DAG)"]
         RR["RouteResolver (Thread-Safe DAG Traversal)"]
-        DR["DocumentRegistry (ConcurrentHashMap Catalog)"]
+        DR["DocumentRegistry (ConcurrentHashMap Catalog - 10 Documents)"]
         RR <--> DR
     end
 
-    subgraph DispatchLayer["3. Central Dispatcher Layer"]
-        SCH["Scheduler (Singleton Mediator)"]
+    subgraph DispatchLayer["3. Central Dispatcher Layer (TicketDispatcher Interface)"]
+        SCH["Scheduler (Singleton DCL) / FaultyScheduler (Check-then-Act Race)"]
     end
 
-    subgraph OfficeLayer["4. Office & Counter Infrastructure (Worker Pool)"]
-        subgraph OfficeCivil["Civil Registry Office"]
-            Q_Civil["OfficeQueue (BlockingOfficeQueue / FaultyOfficeQueue)"]
-            DW_Civil["DeskWorker 1 (Thread)"]
-            Q_Civil --> DW_Civil
-        end
-
-        subgraph OfficeTax["Tax Authority (ANAF) Office"]
-            Q_Tax["OfficeQueue (BlockingOfficeQueue / FaultyOfficeQueue)"]
-            DW_Tax["DeskWorker 2 (Thread)"]
-            Q_Tax --> DW_Tax
-        end
-
-        subgraph OfficePass["Passport Office"]
-            Q_Pass["OfficeQueue (BlockingOfficeQueue / FaultyOfficeQueue)"]
-            DW_Pass["DeskWorker 3 (Thread)"]
-            Q_Pass --> DW_Pass
-        end
+    subgraph OfficeLayer["4. Office Infrastructure (7 Offices / 10 Desks)"]
+        O1["StareaCivila (1 Desk)"]
+        O2["ANAF (2 Desks)"]
+        O3["Politie (1 Desk)"]
+        O4["EvidentaPopulatiei (2 Desks)"]
+        O5["Primarie (1 Desk)"]
+        O6["DirectiaSanatatePublica (1 Desk)"]
+        O7["Pasapoarte (2 Desks)"]
     end
 
     subgraph ResourceLayer["5. Shared Resources & Disruption Scheduling"]
@@ -65,14 +54,14 @@ flowchart TD
         CBS["CoffeeBreakScheduler (ScheduledExecutorService)"]
     end
 
-    C1 & C2 & C3 -->|"Query next prerequisite"| RR
-    C1 & C2 & C3 -->|"Submit ServiceTicket"| SCH
-    SCH -->|"Dispatch ticket"| Q_Civil & Q_Tax & Q_Pass
+    C1 & C2 -->|"1. Query next prerequisite"| RR
+    C1 & C2 -->|"2. Submit ServiceTicket"| SCH
+    SCH -->|"3. Dispatch ticket to OfficeQueue"| O1 & O2 & O3 & O4 & O5 & O6 & O7
 
-    DW_Civil & DW_Tax & DW_Pass -.->|"Acquire / Release Stamp"| STAMP
-    DW_Civil & DW_Tax & DW_Pass -.->|"Acquire / Increment Counter"| CNT
-    CBS -.->|"Inject Periodic Breaks"| DW_Civil & DW_Tax & DW_Pass
-    DW_Civil & DW_Tax & DW_Pass -->|"Asynchronous Completion Signal"| C1 & C2 & C3
+    O1 & O2 & O3 & O4 & O5 & O6 & O7 -.->|"Acquire / Release Stamp"| STAMP
+    O1 & O2 & O3 & O4 & O5 & O6 & O7 -.->|"Acquire / Increment Counter"| CNT
+    CBS -.->|"Inject Periodic Coffee Breaks"| O1 & O2 & O3 & O4 & O5 & O6 & O7
+    O1 & O2 & O3 & O4 & O5 & O6 & O7 -->|"Asynchronous Completion Signal"| C1 & C2
 ```
 
 ---
@@ -81,19 +70,37 @@ flowchart TD
 
 | Team Member            | Module & Package                          | Key Components                                                                                                   | Concurrency Primitives & Patterns Utilized                                                                                     |
 | :--------------------- | :---------------------------------------- | :--------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------- |
-| **Member 1 (Tatiana)** | `bureaucraticSystem.config`               | `Document`, `DocumentRegistry`, `RouteResolver`                                                                  | `ConcurrentHashMap`, defensive immutable `Set.copyOf`, recursive DAG cycle detection                                           |
-| **Member 2 (Luca)**    | `bureaucraticSystem.counter`              | `OfficeQueue`, `BlockingOfficeQueue`, `FaultyOfficeQueue`, `DeskWorker`, `TestMember2`, `TestMember2Fault`       | `LinkedBlockingQueue` (Producer-Consumer), Dependency Injection, `volatile` thread interruption & visibility, Worker Pool      |
-| **Member 3 (Vlad)**    | `bureaucraticSystem.client` & `scheduler` | `Client`, `ServiceTicket`, `Scheduler`                                                                           | `CompletableFuture<Boolean>` async handshake, `ConcurrentHashMap.newKeySet()`, Double-Checked Locking Singleton                |
+| **Member 1 (Tatiana)** | `bureaucraticSystem.config`               | `Document`, `DocumentRegistry`, `RouteResolver`                                                                  | `ConcurrentHashMap`, defensive immutable `Set.copyOf`, 4-tier DAG validation, recursive prerequisite traversal                 |
+| **Member 2 (Luca)**    | `bureaucraticSystem.counter`              | `OfficeQueue`, `BlockingOfficeQueue`, `FaultyOfficeQueue`, `DeskWorker`, `TestMember2`, `TestMember2Fault`       | `LinkedBlockingQueue` (Producer-Consumer) vs unsynchronized `LinkedList`, `volatile` visibility, Worker Pool, graceful shutdown|
+| **Member 3 (Vlad)**    | `bureaucraticSystem.client` & `scheduler` | `Client`, `ServiceTicket`, `TicketDispatcher`, `Scheduler`, `FaultyScheduler`, `Demo`                            | `CompletableFuture<Boolean>` async handshake, `ConcurrentHashMap.newKeySet()`, DCL Singleton vs Check-Then-Act Race Condition |
 | **Member 4 (Bianca)**  | `bureaucraticSystem.resource`             | `OfficialStamp`, `SafeStamp`, `UnsafeStamp`, `DocumentCounter`, `SafeCounter`, `UnsafeCounter`, `CoffeeBreakScheduler` | Fair `ReentrantLock(true)`, `tryLock(timeout)` deadlock avoidance vs blocking `lock()` circular wait, `ScheduledExecutorService` |
 
 ---
 
 ## 4. Dependency Injection Architecture (Safe vs. Faulty Implementations)
 
-To cleanly isolate intentional concurrency faults from the working solution without duplicating business logic, components rely on polymorphic Dependency Injection:
+To cleanly isolate intentional concurrency faults from the working solution without duplicating business logic, components rely on polymorphic Dependency Injection across 4 subsystem interfaces:
 
 ```mermaid
 classDiagram
+    class TicketDispatcher {
+        <<interface>>
+        +registerOffice(String, OfficeQueue)
+        +unregisterOffice(String)
+        +getOfficeQueue(String) OfficeQueue
+        +dispatch(ServiceTicket, String)
+        +dispatch(ServiceTicket)
+        +stop()
+    }
+    class Scheduler {
+        <<Safe Implementation>>
+        Double-Checked Locking Singleton with volatile instance
+    }
+    class FaultyScheduler {
+        <<Faulty Implementation>>
+        Unsynchronized Check-Then-Act causing multi-instantiation race
+    }
+
     class OfficeQueue {
         +addTicket(ServiceTicket)
         +takeTicket() ServiceTicket
@@ -130,17 +137,20 @@ classDiagram
         +acquireCounter()
         +releaseCounter()
         +tryAcquireCounter(long) boolean
-        +increment(String)
+        +increment(String) int
+        +getCount() int
     }
     class SafeCounter {
         <<Safe Implementation>>
-        ReentrantLock(true) + tryLock(timeout)
+        ReentrantLock(true) + synchronized increment
     }
     class UnsafeCounter {
         <<Faulty Implementation>>
-        Blocking lock() ignoring timeout
+        Non-atomic count++ causing Lost Updates
     }
 
+    TicketDispatcher <|.. Scheduler
+    TicketDispatcher <|.. FaultyScheduler
     OfficeQueue <|-- BlockingOfficeQueue
     OfficeQueue <|-- FaultyOfficeQueue
     OfficialStamp <|.. SafeStamp
@@ -151,39 +161,65 @@ classDiagram
     DeskWorker --> OfficeQueue : injected via constructor
     DeskWorker --> OfficialStamp : injected via constructor
     DeskWorker --> DocumentCounter : injected via constructor
+    Client --> TicketDispatcher : injected via constructor
 ```
 
 ---
 
 ## 5. Document Dependency Graph (DAG) Model
 
-Documents cannot be obtained directly. Prerequisite relationships form a Directed Acyclic Graph:
+Documents cannot be obtained directly. Prerequisite relationships form a 4-tier Directed Acyclic Graph with 10 documents, featuring dual target documents (`Pasaport` and `PUZ`) ensuring all citizens traverse the exact same institutional offices:
 
 ```mermaid
-flowchart LR
-    subgraph Prerequisites["Prerequisite Level 0 (Base Documents)"]
-        BC["CertificatNastere (Civil Registry)"]
-        IS["AdeverintaVenit (Tax Authority - ANAF)"]
+flowchart TD
+    subgraph Tier0["Tier 0: Acte de Baza (0 Preconditii)"]
+        D1["CertificatNastere\n(StareaCivila)"]
+        D2["AdeverintaVenit\n(ANAF)"]
+        D3["CazierJudiciar\n(Politie)"]
+        D4["AdeverintaMedicala\n(DirectiaSanatatePublica)"]
     end
 
-    subgraph Intermediate["Intermediate Level 1"]
-        ID["CarteIdentitate (Police Department)"]
+    subgraph Tier1["Tier 1: Acte Intermediare"]
+        D5["CarteIdentitate\n(EvidentaPopulatiei)\n[Req: Nastere + Cazier]"]
+        D6["CertificatFiscal\n(Primarie)\n[Req: AdeverintaVenit]"]
+        D7["AvizPsihologic\n(DirectiaSanatatePublica)\n[Req: AdeverintaMedicala]"]
     end
 
-    subgraph FinalDocs["Target Level 2 (Complex Document)"]
-        PASS["Pasaport (Passport Office)"]
+    subgraph Tier2["Tier 2: Acte Avansate"]
+        D8["CertificatCasatorie\n(StareaCivila)\n[Req: Identitate + Fiscal]"]
+        D9["AutorizatieMediu\n(Primarie)\n[Req: CertificatFiscal]"]
     end
 
-    BC --> PASS
-    IS --> PASS
-    BC -.->|"Optional Prerequisite"| ID
-    ID -.->|"Optional Prerequisite"| PASS
+    subgraph Tier3["Tier 3: Acte Finale Complexe (50% / 50% split)"]
+        TARGET_PASAPORT["Pasaport\n(Pasapoarte)\n[Req: Casatorie, Venit, Cazier, AvizPsiho]"]
+        TARGET_PUZ["PUZ\n(Pasapoarte)\n[Req: Mediu, Nastere, Medicala, Identitate]"]
+    end
 
-    classDef base fill:#d4edda,stroke:#28a745,stroke-width:2px;
-    classDef finalDoc fill:#cce5ff,stroke:#004085,stroke-width:2px;
-    class BC,IS base;
-    class PASS finalDoc;
+    D1 --> D5
+    D3 --> D5
+
+    D2 --> D6
+
+    D4 --> D7
+
+    D5 --> D8
+    D6 --> D8
+
+    D6 --> D9
+
+    D8 --> TARGET_PASAPORT
+    D2 --> TARGET_PASAPORT
+    D3 --> TARGET_PASAPORT
+    D7 --> TARGET_PASAPORT
+
+    D9 --> TARGET_PUZ
+    D1 --> TARGET_PUZ
+    D4 --> TARGET_PUZ
+    D5 --> TARGET_PUZ
 ```
+
+### Shared Office Routing Guarantee:
+Whether a citizen aims for `Pasaport` or `PUZ`, both routes require visiting **all 7 offices** (`StareaCivila`, `ANAF`, `Politie`, `EvidentaPopulatiei`, `Primarie`, `DirectiaSanatatePublica`, `Pasapoarte`), ensuring maximum concurrency, lock contention, and shared queue pressure.
 
 ---
 
@@ -428,14 +464,29 @@ flowchart TD
 - **Fault Mechanism:**
   - Replaces `LinkedBlockingQueue` with an unsynchronized `java.util.LinkedList<ServiceTicket>`.
   - `takeTicket()` checks `if (unsafeList.isEmpty()) return null;` instead of blocking the consumer thread in `WAITING`.
-- **Demonstrated Concurrency Failure (`TestMember2Fault`):**
-  - When 10 concurrent producer threads insert 100 tickets each (1000 total), concurrent mutations of `LinkedList` node pointers (`last.next`) and `size++` collide across CPU cores, losing tickets silently (*Lost Updates*).
+- **Demonstrated Concurrency Failure (`TestMember2Fault` / `DemoVariant.RACE_CONDITION_QUEUE`):**
+  - When concurrent producer threads insert tickets, unsynchronized mutations of `LinkedList` node pointers (`last.next`) and `size++` collide across CPU cores, dropping tickets silently (*Lost Updates*).
   - Calling `takeTicket()` on an empty queue returns `null` immediately instead of suspending the worker thread.
 
-#### 2. Member 4 & Member 2 Fault (Bianca & Luca): `UnsafeStamp` / `UnsafeCounter` vs. `SafeStamp` / `SafeCounter` (Circular Wait Deadlock)
+#### 2. Member 3 Fault (Vlad): `FaultyScheduler` vs. `Scheduler` (Singleton Multi-Instantiation Race Condition)
+- **Dependency Injection Hierarchy:** `TicketDispatcher` interface implemented by `Scheduler` (DCL Safe Singleton) and `FaultyScheduler` (Faulty).
+- **Fault Mechanism:**
+  - `FaultyScheduler.getInstance(registry)` checks `if (instance == null)` without synchronization, and sleeps briefly before assigning `new FaultyScheduler(registry)`.
+  - When clients and setup threads arrive concurrently (coordinated by `CyclicBarrier`), multiple threads simultaneously see `instance == null` and instantiate distinct `FaultyScheduler` objects.
+- **Demonstrated Concurrency Failure (`DemoVariant.RACE_CONDITION_SCHEDULER`):**
+  - The setup thread registers offices in one instance, while client threads query different instances that have empty office registries, causing tickets to be dropped.
+
+#### 3. Member 4 Fault (Bianca): `UnsafeCounter` vs. `SafeCounter` (Lost Updates Race Condition)
+- **Dependency Injection Hierarchy:** `DocumentCounter` interface implemented by `SafeCounter` (Safe) and `UnsafeCounter` (Faulty).
+- **Fault Mechanism:**
+  - `UnsafeCounter.increment(deskId)` performs `int current = this.count; current++; this.count = current;` without atomic primitives or synchronization.
+- **Demonstrated Concurrency Failure (`DemoVariant.RACE_CONDITION_COUNTER`):**
+  - Under heavy concurrent load across all 10 desks, simultaneous reads and writes to `count` overwrite each other, resulting in a recorded document count significantly lower than the actual documents issued.
+
+#### 4. Member 4 & Member 2 Fault (Bianca & Luca): `UnsafeStamp` / `UnsafeCounter` vs. `SafeStamp` / `SafeCounter` (Circular Wait Deadlock)
 - **Dependency Injection Hierarchy:**
-  - `OfficialStamp` interface implemented by `SafeStamp` (uses `lock.tryLock(timeoutMs, MILLISECONDS)`) and `UnsafeStamp` (ignores timeout and calls blocking `lock.lock()`).
-  - `DocumentCounter` interface implemented by `SafeCounter` (uses `lock.tryLock(timeoutMs, MILLISECONDS)`) and `UnsafeCounter` (ignores timeout and calls blocking `lock.lock()`).
+  - `OfficialStamp` implemented by `SafeStamp` (`tryLock(timeout)`) and `UnsafeStamp` (blocking `lock()`).
+  - `DocumentCounter` implemented by `SafeCounter` (`tryLock(timeout)`) and `UnsafeCounter` (blocking `lock()`).
 - **Fault Mechanism:**
   - Desk 1 (`stampFirst = true`) acquires `OfficialStamp` first and then requests `DocumentCounter`.
   - Desk 2 (`stampFirst = false`) acquires `DocumentCounter` first and then requests `OfficialStamp`.
@@ -451,7 +502,7 @@ flowchart LR
     AC1["AC-1: mvn clean compile\n(JDK 25 Bytecode Success)"] --> AC2["AC-2: TestMember2\n(Worker Pool & Clean Shutdown)"]
     AC2 --> AC3["AC-3: TestMember2Fault\n(DI Race Condition vs Safe Queue)"]
     AC3 --> AC4["AC-4: MainTest Execution\n(Full End-to-End Simulation)"]
-    AC4 --> AC5["AC-5: Resource Deadlock vs Safe tryLock\n(SafeStamp/SafeCounter Verification)"]
+    AC4 --> AC5["AC-5: Demo Integration Suite\n(All Safe & Faulty Scenarios)"]
 ```
 
 | Criterion ID | Verification Procedure                | Expected Outcome                                                                                                            |
@@ -460,4 +511,30 @@ flowchart LR
 | **AC-2**     | Execute `TestMember2` independently   | Worker pool of 2 desks processes 4 concurrent clients on a shared queue; `stop()` wakes and closes both desks cleanly.       |
 | **AC-3**     | Execute `TestMember2Fault`            | Demonstrates dropped tickets on `FaultyOfficeQueue` vs 1000/1000 preserved tickets on `BlockingOfficeQueue`.                |
 | **AC-4**     | Execute `MainTest` integration suite  | All 3 concurrent citizens acquire prerequisites and obtain final passport under coffee breaks; logs confirm clean shutdown. |
-| **AC-5**     | Execute Resource Safe vs Unsafe test  | `SafeStamp` + `SafeCounter` resolves lock contention via `tryLock` timeout backoff; `UnsafeStamp` + `UnsafeCounter` demonstrates deadlock. |
+| **AC-5**     | Execute `Demo.main` suite             | Supports all demo variants, build-time defaults, deadlock guard toggle, and cleanly exits or demonstrates faults as configured.|
+
+---
+
+## 12. Unified Simulation & Demonstration Engine (`Demo.java`)
+
+[`Demo.java`](src/main/java/bureaucraticSystem/demo/Demo.java) centralizes institutional assembly, dependency injection wiring, execution modes, and fault verification into a single orchestrator.
+
+### 12.1 Available Demo Variants (`DemoVariant` Enum)
+- `ALL_DEMOS`: Runs all scenarios sequentially, intentionally keeping `DEADLOCK` last.
+- `ALL_GOOD`: The full safe system (all components thread-safe; 100% completion).
+- `RACE_CONDITION_SCHEDULER`: Triggers `FaultyScheduler` singleton multi-instantiation.
+- `RACE_CONDITION_QUEUE`: Triggers `FaultyOfficeQueue` linked-list mutation race.
+- `RACE_CONDITION_COUNTER`: Triggers `UnsafeCounter` lost updates race.
+- `DEADLOCK`: Triggers circular-wait deadlock on shared stamp and counter.
+
+### 12.2 Build-Time Configuration & Defaults
+Configurable at the top of [`Demo.java`](src/main/java/bureaucraticSystem/demo/Demo.java):
+```java
+private static DemoVariant selectedDemo = DemoVariant.ALL_DEMOS;
+public static final int DEFAULT_CLIENT_COUNT = 100;
+private static int defaultClientCount = DEFAULT_CLIENT_COUNT;
+private static boolean deadlockGuardActive = false;
+```
+- **Zero-Argument CLI Execution:** Running `java -cp target/classes bureaucraticSystem.demo.Demo` executes `selectedDemo` with `defaultClientCount` and the build-time `deadlockGuardActive` setting.
+- **Deadlock Guard:** When `false`, the main thread joins client threads indefinitely (`ct.join()`), demonstrating the unmitigated deadlock freeze. When `true`, a defensive timeout detects the deadlock, outputs the diagnostic report, and shuts down cleanly.
+
