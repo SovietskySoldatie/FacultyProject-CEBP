@@ -9,7 +9,6 @@ import java.util.Objects;
 
 /**
  * Reprezintă un ghișeu administrativ individual care rulează pe propriul său fir de execuție (Thread).
- *
  * Funcționează ca un Worker într-un Worker Pool:
  *  - Verifică starea pauzei de cafea înainte de a extrage un tichet din coadă (astfel încât un ghișeu
  *    aflat în pauză să nu blocheze un tichet pe care l-ar putea prelua un alt ghișeu activ).
@@ -70,8 +69,8 @@ public class DeskWorker implements Runnable {
      */
     public DeskWorker(String deskId, OfficeQueue queue, CoffeeBreakScheduler breakScheduler,
                       OfficialStamp stamp, DocumentCounter documentCounter, boolean stampFirst) {
-        this.deskId = Objects.requireNonNull(deskId, "deskId nu poate fi null");
-        this.queue = Objects.requireNonNull(queue, "queue nu poate fi null");
+        this.deskId = Objects.requireNonNull(deskId, "deskId can't be null");
+        this.queue = Objects.requireNonNull(queue, "queue can't be null");
         this.breakScheduler = breakScheduler;
         this.stamp = stamp;
         this.documentCounter = documentCounter;
@@ -83,7 +82,7 @@ public class DeskWorker implements Runnable {
      */
     protected void waitWhileOnCoffeeBreak() throws InterruptedException {
         while (running && breakScheduler != null && breakScheduler.isOnBreak(deskId)) {
-            System.out.println("☕ [" + deskId + "] este în pauză de cafea, așteaptă...");
+            System.out.println(deskId + " is on coffee break. Please wait...");
             Thread.sleep(COFFEE_BREAK_POLL_MS);
         }
     }
@@ -147,7 +146,7 @@ public class DeskWorker implements Runnable {
                             documentCounter.releaseCounter();
                         }
                     } else {
-                        System.out.println("⚠️ [" + deskId + "] Counter ocupat, eliberează ștampila pentru a evita deadlock-ul și reîncearcă...");
+                        System.out.println(deskId + ": Counter locked, release stamp to avoid deadlock and try again...");
                     }
                 } finally {
                     stamp.releaseStamp();
@@ -165,7 +164,7 @@ public class DeskWorker implements Runnable {
                             stamp.releaseStamp();
                         }
                     } else {
-                        System.out.println("⚠️ [" + deskId + "] Ștampilă ocupată, eliberează counter-ul pentru a evita deadlock-ul și reîncearcă...");
+                        System.out.println(deskId + ": Stamp locked, release counter to avoid deadlock and try again...");
                     }
                 } finally {
                     documentCounter.releaseCounter();
@@ -203,7 +202,7 @@ public class DeskWorker implements Runnable {
     @Override
     public void run() {
         this.workerThread = Thread.currentThread();
-        System.out.println("Ghișeul " + deskId + " s-a deschis.");
+        System.out.println("Desk " + deskId + " open.");
 
         try {
             while (running && !Thread.currentThread().isInterrupted()) {
@@ -222,7 +221,7 @@ public class DeskWorker implements Runnable {
                     if (ticket == null) {
                         continue;
                     }
-                    System.out.println(deskId + " a preluat clientul: " + ticket.getClientId());
+                    System.out.println(deskId + " is working with client: " + ticket.getClientId());
 
                     // 3. Procesează efectiv cererea
                     processTicket(ticket);
@@ -241,7 +240,7 @@ public class DeskWorker implements Runnable {
             }
         } finally {
             this.workerThread = null;
-            System.out.println("Ghișeul " + deskId + " s-a închis.");
+            System.out.println("Desk " + deskId + " is closed.");
         }
     }
 }
