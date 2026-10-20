@@ -9,6 +9,7 @@ import java.util.Objects;
 
 /**
  * Reprezintă un ghișeu administrativ individual care rulează pe propriul său fir de execuție (Thread).
+ *
  * Funcționează ca un Worker într-un Worker Pool:
  *  - Verifică starea pauzei de cafea înainte de a extrage un tichet din coadă (astfel încât un ghișeu
  *    aflat în pauză să nu blocheze un tichet pe care l-ar putea prelua un alt ghișeu activ).
@@ -38,7 +39,7 @@ public class DeskWorker implements Runnable {
     private volatile Thread workerThread;
 
     /**
-     * Constructor simplificat: util pentru teste izolate (fără pauză de cafea și resurse externe).
+     * Constructor simplificat: util pentru teste izolate (fără pauză de cafea și ștampilă externă).
      */
     public DeskWorker(String deskId, OfficeQueue queue) {
         this(deskId, queue, null, null, null, true);
@@ -202,7 +203,7 @@ public class DeskWorker implements Runnable {
     @Override
     public void run() {
         this.workerThread = Thread.currentThread();
-        System.out.println("Desk " + deskId + " open.");
+        System.out.println("Ghișeul " + deskId + " s-a deschis.");
 
         try {
             while (running && !Thread.currentThread().isInterrupted()) {
@@ -221,7 +222,7 @@ public class DeskWorker implements Runnable {
                     if (ticket == null) {
                         continue;
                     }
-                    System.out.println(deskId + " is working with client: " + ticket.getClientId());
+                    System.out.println(deskId + " a preluat clientul: " + ticket.getClientId());
 
                     // 3. Procesează efectiv cererea
                     processTicket(ticket);
@@ -240,7 +241,7 @@ public class DeskWorker implements Runnable {
             }
         } finally {
             this.workerThread = null;
-            System.out.println("Desk " + deskId + " is closed.");
+            System.out.println("Ghișeul " + deskId + " s-a închis.");
         }
     }
 }
