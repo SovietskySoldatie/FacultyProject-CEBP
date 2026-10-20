@@ -4,7 +4,7 @@ import bureaucraticSystem.client.request.ServiceTicket;
 import bureaucraticSystem.config.data.Document;
 import bureaucraticSystem.config.graph.RouteResolver;
 import bureaucraticSystem.counter.OfficeQueue;
-import bureaucraticSystem.scheduler.Scheduler;
+import bureaucraticSystem.scheduler.TicketDispatcher;
 
 import java.util.Collections;
 import java.util.Map;
@@ -14,17 +14,20 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
+import java.util.stream.Collectors;
+
 /**
- * Reprezintă un client al sistemului birocratic.
- * Clientul rulează pe propriul său fir de execuție (Thread) și navighează prin birouri
- * pentru a obține toate documentele intermediare necesare până la obținerea actului final.
+ * Reprezinta un client al sistemului birocratic.
+ * Clientul ruleaza pe propriul sau fir de executie (Thread) si navigheaza prin birouri
+ * pentru a obtine toate documentele intermediare necesare pana la obtinerea actului final.
  */
 public class Client implements Runnable {
     private final String clientId;
     private final String targetDocumentId;
-    private final Set<String> ownedDocuments;
+    private final Set<Document> ownedDocuments; // assigned to ConcurrentHashMap.newKeySet
+    private final Map<String, Document> receivedDocuments = new ConcurrentHashMap<>();
     private final RouteResolver routeResolver;
-    private final Scheduler scheduler;
+    private final TicketDispatcher scheduler;
     private final Function<String, OfficeQueue> officeQueueResolver;
     private volatile boolean running = true;
     private volatile boolean completed = false;
@@ -33,13 +36,13 @@ public class Client implements Runnable {
     private volatile ServiceTicket currentTicket;
 
     /**
-     * Constructor principal care folosește Scheduler-ul pentru alocarea către birouri.
+     * Constructor principal care foloseste Scheduler-ul pentru alocarea catre birouri.
      */
     public Client(String clientId,
                   String targetDocumentId,
                   RouteResolver routeResolver,
-                  Scheduler scheduler,
-                  Set<String> initialOwnedDocs) {
+                  TicketDispatcher scheduler,
+                  Set<Document> initialOwnedDocs) {
         this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
         this.targetDocumentId = Objects.requireNonNull(targetDocumentId, "targetDocumentId must not be null");
         this.routeResolver = routeResolver;
@@ -54,7 +57,7 @@ public class Client implements Runnable {
     public Client(String clientId,
                   String targetDocumentId,
                   RouteResolver routeResolver,
-                  Scheduler scheduler) {
+                  TicketDispatcher scheduler) {
         this(clientId, targetDocumentId, routeResolver, scheduler, Collections.emptySet());
     }
 
@@ -63,18 +66,18 @@ public class Client implements Runnable {
      */
     public Client(String clientId,
                   String targetDocumentId,
-                  Scheduler scheduler) {
+                  TicketDispatcher scheduler) {
         this(clientId, targetDocumentId, RouteResolver.getInstance(), scheduler, Collections.emptySet());
     }
 
     /**
-     * Constructor cu funcție de rezolvare a cozilor (pentru teste sau scenarii fără scheduler centralizat).
+     * Constructor cu functie de rezolvare a cozilor (pentru teste sau scenarii fara scheduler centralizat).
      */
     public Client(String clientId,
                   String targetDocumentId,
                   RouteResolver routeResolver,
                   Function<String, OfficeQueue> officeQueueResolver,
-                  Set<String> initialOwnedDocs) {
+                  Set<Document> initialOwnedDocs) {
         this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
         this.targetDocumentId = Objects.requireNonNull(targetDocumentId, "targetDocumentId must not be null");
         this.routeResolver = routeResolver;
@@ -101,7 +104,7 @@ public class Client implements Runnable {
     }
 
     /**
-     * Constructor convenabil pentru o singură coadă (fără graf complet de rute).
+     * Constructor convenabil pentru o singura coada (fara graf complet de rute).
      */
     public Client(String clientId, String targetDocumentId, OfficeQueue singleQueue) {
         this.clientId = Objects.requireNonNull(clientId, "clientId must not be null");
@@ -120,16 +123,47 @@ public class Client implements Runnable {
         return targetDocumentId;
     }
 
-    public Set<String> getOwnedDocuments() {
+    public Set<Document> getOwnedDocuments() {
         return Collections.unmodifiableSet(ownedDocuments);
     }
 
+    public Set<String> getOwnedDocumentIds() {
+        return ownedDocuments.stream()
+                .map(Document::getId)
+                .collect(Collectors.toSet());
+    }
+
+    public boolean ownsDocument(String documentId) {
+        if (documentId == null) {
+            return false;
+        }
+        return ownedDocuments.stream().anyMatch(doc -> documentId.equals(doc.getId()));
+    }
+
+    public Document getOwnedDocument(String documentId) {
+        if (documentId == null) {
+            return null;
+        }
+        return ownedDocuments.stream()
+                .filter(doc -> documentId.equals(doc.getId()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    public Map<String, Document> getReceivedDocuments() {
+        return Collections.unmodifiableMap(receivedDocuments);
+    }
+
+    public Document getReceivedDocument(String documentId) {
+        return receivedDocuments.get(documentId);
+    }
+
     public boolean isCompleted() {
-        return completed || ownedDocuments.contains(targetDocumentId);
+        return completed || ownsDocument(targetDocumentId);
     }
 
     @FunctionalInterface
-    private interface TicketDispatcher {
+    private interface TicketSubmitter {
         void dispatch(ServiceTicket ticket) throws Exception;
     }
 
@@ -149,7 +183,7 @@ public class Client implements Runnable {
         return running;
     }
 
-    public Scheduler getScheduler() {
+    public TicketDispatcher getScheduler() {
         return scheduler;
     }
 
@@ -166,7 +200,7 @@ public class Client implements Runnable {
      * Asigură execuția serializată per client, propagarea semnalului de stop()
      * și curățarea oricăror tichete active în caz de eroare sau întrerupere.
      */
-    private boolean executeTicketRequest(String documentId, TicketDispatcher dispatcher) throws Exception {
+    private boolean executeTicketRequest(String documentId, TicketSubmitter dispatcher) throws Exception {
         if (!running || Thread.currentThread().isInterrupted()) {
             return false;
         }
@@ -187,7 +221,15 @@ public class Client implements Runnable {
                 dispatcher.dispatch(ticket);
                 boolean success = ticket.waitForCompletion();
                 if (success) {
-                    ownedDocuments.add(documentId);
+                    Document issued = ticket.getIssuedDocument();
+                    if (issued != null) {
+                        ownedDocuments.add(issued);
+                        receivedDocuments.put(documentId, issued);
+                    } else {
+                        Document fallbackDoc = new Document(documentId, "UNKNOWN", Set.of(), -1);
+                        ownedDocuments.add(fallbackDoc);
+                        receivedDocuments.put(documentId, fallbackDoc);
+                    }
                     if (targetDocumentId.equals(documentId)) {
                         completed = true;
                     }
@@ -225,7 +267,7 @@ public class Client implements Runnable {
     /**
      * Trimite un tichet prin Scheduler (care se ocupă de alocarea la birou) și așteaptă finalizarea în mod thread-safe.
      */
-    public boolean requestDocument(Scheduler scheduler, String documentId, String officeId) throws Exception {
+    public boolean requestDocument(TicketDispatcher scheduler, String documentId, String officeId) throws Exception {
         if (scheduler == null) {
             throw new IllegalArgumentException("Scheduler cannot be null");
         }
@@ -235,20 +277,20 @@ public class Client implements Runnable {
         if (officeId == null) {
             throw new IllegalArgumentException("officeId cannot be null");
         }
-        return executeTicketRequest(documentId, t -> scheduler.dispatchTicketInternal(t, officeId));
+        return executeTicketRequest(documentId, t -> scheduler.dispatch(t, officeId));
     }
 
     /**
      * Trimite un tichet prin Scheduler fără a specifica biroul (alocare automată pe baza registrului de documente).
      */
-    public boolean requestDocument(Scheduler scheduler, String documentId) throws Exception {
+    public boolean requestDocument(TicketDispatcher scheduler, String documentId) throws Exception {
         if (scheduler == null) {
             throw new IllegalArgumentException("Scheduler cannot be null");
         }
         if (documentId == null) {
             throw new IllegalArgumentException("documentId cannot be null");
         }
-        return executeTicketRequest(documentId, scheduler::dispatchTicketInternal);
+        return executeTicketRequest(documentId, scheduler::dispatch);
     }
 
     /**
@@ -299,20 +341,20 @@ public class Client implements Runnable {
     public void run() {
         this.runnerThread = Thread.currentThread();
         try {
-            System.out.println("Clientul " + clientId + " a pornit în căutarea actului: " + targetDocumentId);
+            System.out.println("Clientul " + clientId + " a pornit in cautarea actului: " + targetDocumentId);
 
             while (running && !isCompleted() && !Thread.currentThread().isInterrupted()) {
                 try {
-                    if (ownedDocuments.contains(targetDocumentId)) {
+                    if (ownsDocument(targetDocumentId)) {
                         completed = true;
                         break;
                     }
 
-                    // Cazul 1 (General): Navigare pe baza grafului de dependențe (RouteResolver)
+                    // Cazul 1 (General): Navigare pe baza grafului de dependente (RouteResolver)
                     if (routeResolver != null) {
-                        Optional<Document> nextDocOpt = routeResolver.resolve(ownedDocuments, targetDocumentId);
+                        Optional<Document> nextDocOpt = routeResolver.resolve(getOwnedDocumentIds(), targetDocumentId);
                         if (nextDocOpt.isEmpty()) {
-                            System.err.println("[" + clientId + "] Nu s-a putut determina următorul pas pentru actul: " + targetDocumentId);
+                            System.err.println("[" + clientId + "] Nu s-a putut determina urmatorul pas pentru actul: " + targetDocumentId);
                             break;
                         }
 
@@ -320,21 +362,21 @@ public class Client implements Runnable {
                         boolean success;
 
                         if (scheduler != null) {
-                            // Clientul obține tichetul, iar alocarea la birou este făcută de Scheduler
+                            // Clientul obtine tichetul, iar alocarea la birou este facuta de Scheduler
                             if (nextDoc.getOfficeId() != null) {
-                                System.out.println("[" + clientId + "] Trimite tichetul pentru " + nextDoc.getId() + " prin Scheduler către biroul " + nextDoc.getOfficeId());
+                                System.out.println("[" + clientId + "] Trimite tichetul pentru " + nextDoc.getId() + " prin Scheduler catre biroul " + nextDoc.getOfficeId());
                                 success = requestDocument(scheduler, nextDoc.getId(), nextDoc.getOfficeId());
                             } else {
-                                System.out.println("[" + clientId + "] Trimite tichetul pentru " + nextDoc.getId() + " prin Scheduler (alocare automată)");
+                                System.out.println("[" + clientId + "] Trimite tichetul pentru " + nextDoc.getId() + " prin Scheduler (alocare automata)");
                                 success = requestDocument(scheduler, nextDoc.getId());
                             }
                         } else if (officeQueueResolver != null) {
                             OfficeQueue queue = officeQueueResolver.apply(nextDoc.getOfficeId());
                             if (queue == null) {
-                                System.err.println("[" + clientId + "] Coada pentru biroul " + nextDoc.getOfficeId() + " nu a fost găsită!");
+                                System.err.println("[" + clientId + "] Coada pentru biroul " + nextDoc.getOfficeId() + " nu a fost gasita!");
                                 break;
                             }
-                            System.out.println("[" + clientId + "] Se așază la coada biroului " + nextDoc.getOfficeId() + " pentru actul " + nextDoc.getId());
+                            System.out.println("[" + clientId + "] Se aseaza la coada biroului " + nextDoc.getOfficeId() + " pentru actul " + nextDoc.getId());
                             success = requestDocument(queue, nextDoc.getId());
                         } else {
                             System.err.println("[" + clientId + "] Niciun scheduler sau rezolvitor de cozi configurat!");
@@ -342,21 +384,21 @@ public class Client implements Runnable {
                         }
 
                         if (!success) {
-                            System.err.println("[" + clientId + "] Cererea a eșuat pentru actul " + nextDoc.getId());
+                            System.err.println("[" + clientId + "] Cererea a esuat pentru actul " + nextDoc.getId());
                             break;
                         }
                     // Cazul 2 (Caz particular / Unit Tests):
-                    // Util în scenarii de testare izolate (UTs) sau coadă unică (routeResolver == null).
-                    // Clientul nu navighează un graf de dependențe, ci solicită direct actul dorit.
+                    // Util in scenarii de testare izolate (UTs) sau coada unica (routeResolver == null).
+                    // Clientul nu navigheaza un graf de dependente, ci solicita direct actul dorit.
                     } else if (officeQueueResolver != null) {
                         OfficeQueue queue = officeQueueResolver.apply(null);
                         if (queue == null) {
-                            System.err.println("[" + clientId + "] Coada unică nu a fost găsită!");
+                            System.err.println("[" + clientId + "] Coada unica nu a fost gasita!");
                             break;
                         }
                         requestDocument(queue, targetDocumentId);
                         break;
-                    // Cazul 3 (Eroare de configurare / Gardă defensivă):
+                    // Cazul 3 (Eroare de configurare / Garda defensiva):
                     // Niciun mecanism de rezolvare a cozilor, a rutelor sau scheduler nu a fost configurat.
                     } else {
                         System.err.println("[" + clientId + "] Niciun rezolvitor de cozi configurat.");
@@ -364,7 +406,7 @@ public class Client implements Runnable {
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    System.out.println("Clientul " + clientId + " a fost întrerupt.");
+                    System.out.println("Clientul " + clientId + " a fost intrerupt.");
                     break;
                 } catch (Exception e) {
                     System.err.println("Eroare la clientul " + clientId + ": " + e.getMessage());
@@ -375,11 +417,11 @@ public class Client implements Runnable {
             this.runnerThread = null;
         }
 
-        if (ownedDocuments.contains(targetDocumentId)) {
+        if (ownsDocument(targetDocumentId)) {
             completed = true;
-            System.out.println("Clientul " + clientId + " a obținut cu succes actul final: " + targetDocumentId);
+            System.out.println("Clientul " + clientId + " a obtinut cu succes actul final: " + targetDocumentId);
         } else {
-            System.out.println("Clientul " + clientId + " s-a oprit fără a finaliza actul " + targetDocumentId);
+            System.out.println("Clientul " + clientId + " s-a oprit fara a finaliza actul " + targetDocumentId);
         }
     }
 }

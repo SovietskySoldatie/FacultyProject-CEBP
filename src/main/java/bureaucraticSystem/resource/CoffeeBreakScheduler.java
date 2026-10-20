@@ -72,7 +72,7 @@ public class CoffeeBreakScheduler {
                             // VERIFICAREA CHEIE: Doar dacă generația este aceeași, modificăm starea
                             if (state.generation == currentGen) {
                                 state.onBreak.set(false);
-                                System.out.println(" 🏢 " + deskId + " is back from coffee break.");
+                                System.out.println(deskId + " is back from coffee break.");
                             }
                         }
                     }, breakDurationSec, TimeUnit.SECONDS);

@@ -20,7 +20,7 @@ public class Test {
         t1.start();
         t2.start();
 
-        System.out.println("--- Ghișeele au fost deschise. Așteptăm clienții... ---\n");
+        System.out.println("--- Ghiseele au fost deschise. Asteptam clientii... ---\n");
         Thread.sleep(500);
 
         List<Thread> clientThreads = new ArrayList<>();
@@ -36,7 +36,7 @@ public class Test {
             ct.join();
         }
 
-        System.out.println("\n--- Toți clienții au primit actul! ---");
+        System.out.println("\n--- Toti clientii au primit actul! ---");
 
         worker1.stop();
         worker2.stop();

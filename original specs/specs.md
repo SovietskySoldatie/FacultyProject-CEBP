@@ -64,3 +64,32 @@ Programs are written in **Java**, using the standard concurrency framework (`jav
 * **Week 5:** Stage 1 wrap-up and student oral evaluation. Students receive individual grades based on their contribution, involvement, and answers to theoretical and practical questions.
 * **Grade Weight:** Stage 1 counts as **35% of the total lab grade**.
 
+---
+
+## 4. Current Code & Implementation Status (Stage 1)
+
+All mandatory requirements for Stage 1 have been implemented, verified, and assembled into an integrated simulation engine ([`Demo.java`](src/main/java/bureaucraticSystem/demo/Demo.java)):
+
+### 4.1 Complete and Working Solution (`DemoVariant.ALL_GOOD`)
+* **Institutional DAG:** 10 administrative documents organized across 4 dependency tiers with two final document goals: **`Pasaport`** (50% of clients) and **`PUZ`** (50% of clients). Both paths share the exact same administrative offices.
+* **7 Administrative Offices:** `StareaCivila`, `ANAF`, `Politie`, `EvidentaPopulatiei`, `Primarie`, `DirectiaSanatatePublica`, `Pasapoarte`.
+* **10 Counter Workers (`DeskWorker`):** Multi-counter offices (`ANAF`, `EvidentaPopulatiei`, `Pasapoarte`) operate concurrent desks pulling from a shared `BlockingOfficeQueue`.
+* **Stochastic Disruptions:** Periodic coffee breaks managed by [`CoffeeBreakScheduler`](src/main/java/bureaucraticSystem/resource/CoffeeBreakScheduler.java) backed by `ScheduledExecutorService`.
+* **Thread-Safe Shared Resources:** [`SafeStamp`](src/main/java/bureaucraticSystem/resource/SafeStamp.java) and [`SafeCounter`](src/main/java/bureaucraticSystem/resource/SafeCounter.java) use fair `ReentrantLock(true)` and `tryLock` with timed backoff, eliminating deadlocks.
+* **Thread-Safe Dispatcher:** [`Scheduler`](src/main/java/bureaucraticSystem/scheduler/Scheduler.java) implements Double-Checked Locking (DCL) with `volatile instance` and `CompletableFuture` signaling.
+
+### 4.2 Faulty Solutions Catalog (Intentional Concurrency Errors via Dependency Injection)
+1. **Singleton Race Condition (`DemoVariant.RACE_CONDITION_SCHEDULER`):**
+   * Class: [`FaultyScheduler`](src/main/java/bureaucraticSystem/scheduler/FaultyScheduler.java) (Check-Then-Act without synchronization on `getInstance()`).
+   * Effect: Deterministically instantiates multiple dispatchers when client threads start simultaneously, causing office registrations to be scattered across distinct instances and dropping tickets.
+2. **Queue Data Incoherence & Lost Updates (`DemoVariant.RACE_CONDITION_QUEUE`):**
+   * Class: [`FaultyOfficeQueue`](src/main/java/bureaucraticSystem/counter/FaultyOfficeQueue.java) (Unsynchronized `java.util.LinkedList`).
+   * Effect: Concurrent producer/consumer operations corrupt internal linked-list pointers, causing dropped tickets and non-blocking null returns.
+3. **Counter Lost Updates (`DemoVariant.RACE_CONDITION_COUNTER`):**
+   * Class: [`UnsafeCounter`](src/main/java/bureaucraticSystem/resource/UnsafeCounter.java) (`count++` without atomicity or locking).
+   * Effect: Concurrent registrations suffer write collisions, yielding a registered count lower than the actual documents issued.
+4. **Circular Wait Deadlock (`DemoVariant.DEADLOCK`):**
+   * Classes: [`UnsafeStamp`](src/main/java/bureaucraticSystem/resource/UnsafeStamp.java) + [`UnsafeCounter`](src/main/java/bureaucraticSystem/resource/UnsafeCounter.java) with blocking `lock.lock()`.
+   * Effect: `Desk-ANAF-1` acquires Stamp then Counter; `Desk-ANAF-2` acquires Counter then Stamp, causing a classic Coffman circular-wait deadlock. Controlled by the configurable build-time `deadlockGuardActive` toggle.
+
+

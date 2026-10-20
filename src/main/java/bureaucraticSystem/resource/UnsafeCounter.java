@@ -18,8 +18,14 @@ public class UnsafeCounter implements DocumentCounter {
     }
 
     @Override
-    public void increment(String deskId) {
+    public int increment(String deskId) {
         count++;
         System.out.println("Unsafe counter " + deskId + " registered. Total: " + count);
+        return count;
+    }
+
+    @Override
+    public int getCount() {
+        return count;
     }
 }

@@ -19,7 +19,7 @@ import java.util.Set;
  */
 public class MainTest {
     public static void main(String[] args) throws InterruptedException {
-        System.out.println("=== Începere Simulare Sistem Birocratic ===\n");
+        System.out.println("=== Incepere Simulare Sistem Birocratic ===\n");
 
         // ---------------------------------------------------------
         // 1. CONFIGURARE DATE ȘI RUTARE (Membrul 1)
@@ -77,13 +77,13 @@ public class MainTest {
         t2.start();
         t3.start();
 
-        System.out.println("--- Instituția s-a deschis. Angajații sunt la ghișee! ---\n");
+        System.out.println("--- Institutia s-a deschis. Angajatii sunt la ghisee! ---\n");
         Thread.sleep(1000); // Lăsăm 1 secundă să se așeze lucrurile
 
         // ---------------------------------------------------------
         // 5. LANSARE CLIENȚI (Membrul 3)
         // ---------------------------------------------------------
-        System.out.println("--- Au intrat clienții! ---");
+        System.out.println("--- Au intrat clientii! ---");
         List<Thread> clientThreads = new ArrayList<>();
 
         // Lansăm 3 clienți simultan care vor pașaport
@@ -101,7 +101,7 @@ public class MainTest {
             ct.join(); // Firul principal așteaptă până când fiecare cetățean termină
         }
 
-        System.out.println("\n--- Toți clienții și-au primit actele și au plecat! ---");
+        System.out.println("\n--- Toti clientii si-au primit actele si au plecat! ---");
 
         // ---------------------------------------------------------
         // 7. ÎNCHIDERE CURATĂ (Graceful Shutdown)
@@ -118,6 +118,6 @@ public class MainTest {
         Scheduler.resetInstance();
         RouteResolver.resetInstance();
 
-        System.out.println("=== Simulare încheiată cu succes ===");
+        System.out.println("=== Simulare incheiata cu succes ===");
     }
 }
