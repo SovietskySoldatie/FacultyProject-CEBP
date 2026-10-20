@@ -11,13 +11,22 @@ import java.util.Objects;
  * Reprezintă un ghișeu administrativ individual care rulează pe propriul său fir de execuție (Thread).
  *
  * Funcționează ca un Worker într-un Worker Pool:
+ *  - Verifică starea pauzei de cafea înainte de a extrage un tichet din coadă (astfel încât un ghișeu
+ *    aflat în pauză să nu blocheze un tichet pe care l-ar putea prelua un alt ghișeu activ).
  *  - Extrage continuu tichete din OfficeQueue (operație blocantă takeTicket).
- *  - Respectă întreruperile pentru pauza de cafea (CoffeeBreakScheduler).
  *  - Solicită acces exclusiv la resursele partajate (OfficialStamp și DocumentCounter) prin Dependency Injection.
- *  - Notifică asincron clientul când actul este eliberat (ticket.markCompleted()).
- *  - Permite oprire curată (graceful shutdown) prin variabila volatile 'running' și semnal de întrerupere.
+ *  - Notifică asincron clientul când actul este eliberat (ticket.markCompleted()), sau garantează
+ *    deblocarea clientului prin ticket.markFailed() în blocul finally în caz de întrerupere/excepție.
+ *  - Permite oprire curată (graceful shutdown) prin variabila volatile 'running' și auto-întrerupere în stop().
  */
 public class DeskWorker implements Runnable {
+
+    public static final long COFFEE_BREAK_POLL_MS = 300L;
+    public static final long DRAFTING_DURATION_MS = 150L;
+    public static final long STAMP_DURATION_MS = 200L;
+    public static final long RESOURCE_TRY_LOCK_TIMEOUT_MS = 300L;
+    public static final long RESOURCE_CONFLICT_WINDOW_MS = 100L;
+    public static final long RESOURCE_RETRY_BACKOFF_MS = 50L;
 
     private final String deskId;
     private final OfficeQueue queue;
@@ -70,21 +79,28 @@ public class DeskWorker implements Runnable {
     }
 
     /**
+     * Așteaptă cât timp ghișeul se află în pauză de cafea.
+     */
+    protected void waitWhileOnCoffeeBreak() throws InterruptedException {
+        while (running && breakScheduler != null && breakScheduler.isOnBreak(deskId)) {
+            System.out.println("☕ [" + deskId + "] este în pauză de cafea, așteaptă...");
+            Thread.sleep(COFFEE_BREAK_POLL_MS);
+        }
+    }
+
+    /**
      * Logica de procesare a unui tichet:
-     *  1. Verifică și așteaptă dacă ghișeul este în pauză de cafea.
-     *  2. Simulează timpul de lucru pentru redactarea documentului (150ms).
+     *  1. Verifică dacă a intervenit o pauză de cafea imediat după preluarea tichetului.
+     *  2. Simulează timpul de lucru pentru redactarea documentului (DRAFTING_DURATION_MS).
      *  3. Achiziționează resursele partajate (OfficialStamp și/sau DocumentCounter).
      *  4. Notifică clientul că documentul a fost eliberat cu succes.
      */
     protected void processTicket(ServiceTicket ticket) throws InterruptedException {
         // Pasul 1: Dacă este programată pauza de cafea, ghișeul așteaptă finalizarea ei
-        while (breakScheduler != null && breakScheduler.isOnBreak(deskId)) {
-            System.out.println("☕ [" + deskId + "] este în pauză de cafea, cererea așteaptă...");
-            Thread.sleep(300);
-        }
+        waitWhileOnCoffeeBreak();
 
         // Pasul 2: Simulează redactarea și verificarea documentului
-        Thread.sleep(150);
+        Thread.sleep(DRAFTING_DURATION_MS);
 
         // Pasul 3: Utilizarea resurselor partajate (OfficialStamp & DocumentCounter)
         if (stamp != null && documentCounter != null) {
@@ -92,7 +108,7 @@ public class DeskWorker implements Runnable {
         } else if (stamp != null) {
             stamp.acquireStamp();
             try {
-                stamp.simulateUsage(deskId, 200);
+                stamp.simulateUsage(deskId, STAMP_DURATION_MS);
             } finally {
                 stamp.releaseStamp();
             }
@@ -117,16 +133,16 @@ public class DeskWorker implements Runnable {
      *    Circular Wait Deadlock când două ghișee au ordine opusă (stampFirst = true vs false).
      */
     private void acquireBothResourcesAndProcess() throws InterruptedException {
-        boolean completed = false;
-        while (!completed && running && !Thread.currentThread().isInterrupted()) {
+        boolean resourcesAcquired = false;
+        while (!resourcesAcquired && running && !Thread.currentThread().isInterrupted()) {
             if (stampFirst) {
                 stamp.acquireStamp();
                 try {
-                    stamp.simulateUsage(deskId, 200);
-                    if (documentCounter.tryAcquireCounter(300)) {
+                    stamp.simulateUsage(deskId, STAMP_DURATION_MS);
+                    if (documentCounter.tryAcquireCounter(RESOURCE_TRY_LOCK_TIMEOUT_MS)) {
                         try {
                             documentCounter.increment(deskId);
-                            completed = true;
+                            resourcesAcquired = true;
                         } finally {
                             documentCounter.releaseCounter();
                         }
@@ -139,12 +155,12 @@ public class DeskWorker implements Runnable {
             } else {
                 documentCounter.acquireCounter();
                 try {
-                    Thread.sleep(100);
-                    if (stamp.tryAcquireStamp(300)) {
+                    Thread.sleep(RESOURCE_CONFLICT_WINDOW_MS);
+                    if (stamp.tryAcquireStamp(RESOURCE_TRY_LOCK_TIMEOUT_MS)) {
                         try {
-                            stamp.simulateUsage(deskId, 200);
+                            stamp.simulateUsage(deskId, STAMP_DURATION_MS);
                             documentCounter.increment(deskId);
-                            completed = true;
+                            resourcesAcquired = true;
                         } finally {
                             stamp.releaseStamp();
                         }
@@ -156,8 +172,8 @@ public class DeskWorker implements Runnable {
                 }
             }
 
-            if (!completed) {
-                Thread.sleep(50);
+            if (!resourcesAcquired) {
+                Thread.sleep(RESOURCE_RETRY_BACKOFF_MS);
             }
         }
     }
@@ -192,22 +208,35 @@ public class DeskWorker implements Runnable {
         try {
             while (running && !Thread.currentThread().isInterrupted()) {
                 ServiceTicket ticket = null;
+                boolean completed = false;
                 try {
-                    // 1. Așteaptă blocant la coadă un tichet (fără consum CPU)
+                    // 1. Verificăm pauza de cafea ÎNAINTE de a extrage tichetul din coadă,
+                    // pentru a lăsa alte ghișee libere să preia tichetele din coada comună.
+                    waitWhileOnCoffeeBreak();
+                    if (!running || Thread.currentThread().isInterrupted()) {
+                        break;
+                    }
+
+                    // 2. Așteaptă blocant la coadă un tichet (fără consum CPU)
                     ticket = queue.takeTicket();
+                    if (ticket == null) {
+                        continue;
+                    }
                     System.out.println(deskId + " a preluat clientul: " + ticket.getClientId());
 
-                    // 2. Procesează efectiv cererea
+                    // 3. Procesează efectiv cererea
                     processTicket(ticket);
+                    completed = true;
 
                 } catch (InterruptedException e) {
-                    // Dacă firul este întrerupt în timpul procesării, deblocăm clientul cu eșec
-                    if (ticket != null) {
-                        ticket.markFailed();
-                    }
                     // Restaurăm fanionul de întrerupere conform bunelor practici Java Concurrency
                     Thread.currentThread().interrupt();
                     break;
+                } finally {
+                    // Garantăm deblocarea clientului chiar și în caz de InterruptedException sau RuntimeException
+                    if (ticket != null && !completed) {
+                        ticket.markFailed();
+                    }
                 }
             }
         } finally {
