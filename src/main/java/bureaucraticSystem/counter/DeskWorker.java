@@ -72,7 +72,7 @@ public class DeskWorker implements Runnable {
 
     @Override
     public void run() {
-        System.out.println("Ghișeul " + deskId + " s-a deschis.");
+        System.out.println("Ghiseul " + deskId + " s-a deschis.");
         while (running && !Thread.currentThread().isInterrupted()) {
             try {
                 // 1. Așteaptă la coadă un tichet (operație blocantă thread-safe)
@@ -89,6 +89,6 @@ public class DeskWorker implements Runnable {
                 break;
             }
         }
-        System.out.println("Ghișeul " + deskId + " s-a închis.");
+        System.out.println("Ghiseul " + deskId + " s-a inchis.");
     }
 }

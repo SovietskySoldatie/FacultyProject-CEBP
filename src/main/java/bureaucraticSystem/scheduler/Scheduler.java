@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Gestionează alocarea thread-safe a cererilor (ServiceTicket) către birouri
  * și resursele sistemului birocratic (ghișee, cozi, disponibilitate).
  */
-public class Scheduler {
+public class Scheduler implements TicketDispatcher {
     private static volatile Scheduler instance;
     private static final Object LOCK = new Object();
 
@@ -150,6 +150,16 @@ public class Scheduler {
         }
 
         dispatchTicketInternal(ticket, doc.getOfficeId());
+    }
+
+    @Override
+    public void dispatch(ServiceTicket ticket, String officeId) throws InterruptedException {
+        dispatchTicketInternal(ticket, officeId);
+    }
+
+    @Override
+    public void dispatch(ServiceTicket ticket) throws InterruptedException {
+        dispatchTicketInternal(ticket);
     }
 
     public void stop() {
