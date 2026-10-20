@@ -18,7 +18,7 @@ import java.util.List;
 public class TestMember2Fault {
 
     public static void main(String[] args) throws Exception {
-        System.out.println("=== DEMONSTRAȚIE FAULT MEMBRU 2: Data Incoherence & Race Condition ===\n");
+        System.out.println("=== DEMONSTRATIE FAULT MEMBRU 2: Data Incoherence & Race Condition ===\n");
 
         int numThreads = 10;
         int ticketsPerThread = 100;
@@ -27,7 +27,7 @@ public class TestMember2Fault {
         // -------------------------------------------------------------
         // TESTUL 1: Rularea cu Clasa REA (FaultyOfficeQueue) via Dependency Injection
         // -------------------------------------------------------------
-        System.out.println("--- Testare cu FaultyOfficeQueue (Listă nesincronizată) ---");
+        System.out.println("--- Testare cu FaultyOfficeQueue (Lista nesincronizata) ---");
         OfficeQueue faultyQueue = new FaultyOfficeQueue(); // <-- DEPENDENCY INJECTION a clasei cu fault
 
         List<Thread> producers = new ArrayList<>();
@@ -38,7 +38,7 @@ public class TestMember2Fault {
                     try {
                         faultyQueue.addTicket(new ServiceTicket("Client-T" + threadId + "-" + i, "Certificat"));
                     } catch (Exception e) {
-                        System.err.println("Eroare la adăugare în FaultyQueue: " + e);
+                        System.err.println("Eroare la adaugare in FaultyQueue: " + e);
                     }
                 }
             });
@@ -50,32 +50,32 @@ public class TestMember2Fault {
             p.join();
         }
 
-        System.out.println("Tichete așteptate: " + totalExpectedTickets);
-        System.out.println("Tichete găsite în FaultyQueue: " + faultyQueue.size());
+        System.out.println("Tichete asteptate: " + totalExpectedTickets);
+        System.out.println("Tichete gasite in FaultyQueue: " + faultyQueue.size());
 
         if (faultyQueue.size() != totalExpectedTickets) {
-            System.out.println("🔴 REZULTAT FAULT DETECTAT: S-au pierdut "
+            System.out.println("REZULTAT FAULT DETECTAT: S-au pierdut "
                     + (totalExpectedTickets - faultyQueue.size())
                     + " tichete din cauza lipsei de sincronizare (RACE CONDITION)!\n");
         } else {
-            System.out.println("⚠️ Notă: Race condition-ul depinde de planificarea nucleelor OS.\n");
+            System.out.println("Nota: Race condition-ul depinde de planificarea nucleelor OS.\n");
         }
 
         // -------------------------------------------------------------
         // TESTUL 2: Demonstrarea Comportamentului Non-Blocant Incorect
         // -------------------------------------------------------------
-        System.out.println("--- Testare comportament non-blocant pe coadă goală ---");
+        System.out.println("--- Testare comportament non-blocant pe coada goala ---");
         OfficeQueue emptyFaultyQueue = new FaultyOfficeQueue();
         ServiceTicket ticket = emptyFaultyQueue.takeTicket();
-        System.out.println("Rezultat takeTicket() pe coadă goală: " + ticket);
+        System.out.println("Rezultat takeTicket() pe coada goala: " + ticket);
         if (ticket == null) {
-            System.out.println("🔴 REZULTAT FAULT DETECTAT: takeTicket() a returnat null imediat în loc să blocheze firul în WAITING!\n");
+            System.out.println("REZULTAT FAULT DETECTAT: takeTicket() a returnat null imediat in loc sa blocheze firul in WAITING!\n");
         }
 
         // -------------------------------------------------------------
         // TESTUL 3: Rularea cu Clasa BUNĂ (BlockingOfficeQueue) pentru Comparație
         // -------------------------------------------------------------
-        System.out.println("--- Comparație cu BlockingOfficeQueue (Thread-Safe) ---");
+        System.out.println("--- Comparatie cu BlockingOfficeQueue (Thread-Safe) ---");
         OfficeQueue safeQueue = new BlockingOfficeQueue(); // <-- DEPENDENCY INJECTION a clasei corecte
 
         List<Thread> safeProducers = new ArrayList<>();
@@ -96,13 +96,13 @@ public class TestMember2Fault {
             p.join();
         }
 
-        System.out.println("Tichete așteptate: " + totalExpectedTickets);
-        System.out.println("Tichete găsite în BlockingQueue: " + safeQueue.size());
+        System.out.println("Tichete asteptate: " + totalExpectedTickets);
+        System.out.println("Tichete gasite in BlockingQueue: " + safeQueue.size());
         if (safeQueue.size() == totalExpectedTickets) {
-            System.out.println("🟢 REZULTAT CORECT: Exact 1000/1000 tichete înregistrate (Integritate 100% garantată)!");
+            System.out.println("REZULTAT CORECT: Exact 1000/1000 tichete inregistrate (Integritate 100% garantata)!");
         }
 
-        System.out.println("\n=== Demonstrație finalizată cu succes ===");
+        System.out.println("\n=== Demonstratie finalizata cu succes ===");
     }
 }
 

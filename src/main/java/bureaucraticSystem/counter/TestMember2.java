@@ -17,7 +17,7 @@ import java.util.List;
 public class TestMember2 {
 
     public static void main(String[] args) throws Exception {
-        System.out.println("=== Pornire TestMember2: Cozi & Ghișee (Worker Pool Paralel) ===\n");
+        System.out.println("=== Pornire TestMember2: Cozi & Ghisee (Worker Pool Paralel) ===\n");
 
         // 1. Creăm coada unică a biroului
         OfficeQueue queue = new OfficeQueue();
@@ -39,7 +39,7 @@ public class TestMember2 {
             ServiceTicket tichet = new ServiceTicket(clientName, "CertificatNastere");
             tickets.add(tichet);
 
-            System.out.println(">> " + clientName + " se așază la coada biroului.");
+            System.out.println(">> " + clientName + " se aseaza la coada biroului.");
             queue.addTicket(tichet);
         }
 
@@ -47,7 +47,7 @@ public class TestMember2 {
         for (ServiceTicket tichet : tickets) {
             boolean actFinalizat = tichet.waitForCompletion();
             if (actFinalizat) {
-                System.out.println("<< " + tichet.getClientId() + " și-a primit actul și pleacă mulțumit!");
+                System.out.println("<< " + tichet.getClientId() + " si-a primit actul si pleaca multumit!");
             }
         }
 

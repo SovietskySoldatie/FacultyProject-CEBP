@@ -299,7 +299,7 @@ public class Client implements Runnable {
     public void run() {
         this.runnerThread = Thread.currentThread();
         try {
-            System.out.println("Clientul " + clientId + " a pornit în căutarea actului: " + targetDocumentId);
+            System.out.println("Clientul " + clientId + " a pornit in cautarea actului: " + targetDocumentId);
 
             while (running && !isCompleted() && !Thread.currentThread().isInterrupted()) {
                 try {
@@ -312,7 +312,7 @@ public class Client implements Runnable {
                     if (routeResolver != null) {
                         Optional<Document> nextDocOpt = routeResolver.resolve(ownedDocuments, targetDocumentId);
                         if (nextDocOpt.isEmpty()) {
-                            System.err.println("[" + clientId + "] Nu s-a putut determina următorul pas pentru actul: " + targetDocumentId);
+                            System.err.println("[" + clientId + "] Nu s-a putut determina urmatorul pas pentru actul: " + targetDocumentId);
                             break;
                         }
 
@@ -322,19 +322,19 @@ public class Client implements Runnable {
                         if (scheduler != null) {
                             // Clientul obține tichetul, iar alocarea la birou este făcută de Scheduler
                             if (nextDoc.getOfficeId() != null) {
-                                System.out.println("[" + clientId + "] Trimite tichetul pentru " + nextDoc.getId() + " prin Scheduler către biroul " + nextDoc.getOfficeId());
+                                System.out.println("[" + clientId + "] Trimite tichetul pentru " + nextDoc.getId() + " prin Scheduler catre biroul " + nextDoc.getOfficeId());
                                 success = requestDocument(scheduler, nextDoc.getId(), nextDoc.getOfficeId());
                             } else {
-                                System.out.println("[" + clientId + "] Trimite tichetul pentru " + nextDoc.getId() + " prin Scheduler (alocare automată)");
+                                System.out.println("[" + clientId + "] Trimite tichetul pentru " + nextDoc.getId() + " prin Scheduler (alocare automata)");
                                 success = requestDocument(scheduler, nextDoc.getId());
                             }
                         } else if (officeQueueResolver != null) {
                             OfficeQueue queue = officeQueueResolver.apply(nextDoc.getOfficeId());
                             if (queue == null) {
-                                System.err.println("[" + clientId + "] Coada pentru biroul " + nextDoc.getOfficeId() + " nu a fost găsită!");
+                                System.err.println("[" + clientId + "] Coada pentru biroul " + nextDoc.getOfficeId() + " nu a fost gasita!");
                                 break;
                             }
-                            System.out.println("[" + clientId + "] Se așază la coada biroului " + nextDoc.getOfficeId() + " pentru actul " + nextDoc.getId());
+                            System.out.println("[" + clientId + "] Se aseaza la coada biroului " + nextDoc.getOfficeId() + " pentru actul " + nextDoc.getId());
                             success = requestDocument(queue, nextDoc.getId());
                         } else {
                             System.err.println("[" + clientId + "] Niciun scheduler sau rezolvitor de cozi configurat!");
@@ -342,7 +342,7 @@ public class Client implements Runnable {
                         }
 
                         if (!success) {
-                            System.err.println("[" + clientId + "] Cererea a eșuat pentru actul " + nextDoc.getId());
+                            System.err.println("[" + clientId + "] Cererea a esuat pentru actul " + nextDoc.getId());
                             break;
                         }
                     // Cazul 2 (Caz particular / Unit Tests):
@@ -351,7 +351,7 @@ public class Client implements Runnable {
                     } else if (officeQueueResolver != null) {
                         OfficeQueue queue = officeQueueResolver.apply(null);
                         if (queue == null) {
-                            System.err.println("[" + clientId + "] Coada unică nu a fost găsită!");
+                            System.err.println("[" + clientId + "] Coada unica nu a fost gasita!");
                             break;
                         }
                         requestDocument(queue, targetDocumentId);
@@ -364,7 +364,7 @@ public class Client implements Runnable {
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    System.out.println("Clientul " + clientId + " a fost întrerupt.");
+                    System.out.println("Clientul " + clientId + " a fost intrerupt.");
                     break;
                 } catch (Exception e) {
                     System.err.println("Eroare la clientul " + clientId + ": " + e.getMessage());
@@ -377,9 +377,9 @@ public class Client implements Runnable {
 
         if (ownedDocuments.contains(targetDocumentId)) {
             completed = true;
-            System.out.println("Clientul " + clientId + " a obținut cu succes actul final: " + targetDocumentId);
+            System.out.println("Clientul " + clientId + " a obtinut cu succes actul final: " + targetDocumentId);
         } else {
-            System.out.println("Clientul " + clientId + " s-a oprit fără a finaliza actul " + targetDocumentId);
+            System.out.println("Clientul " + clientId + " s-a oprit fara a finaliza actul " + targetDocumentId);
         }
     }
 }

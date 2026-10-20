@@ -203,7 +203,7 @@ public class DeskWorker implements Runnable {
     @Override
     public void run() {
         this.workerThread = Thread.currentThread();
-        System.out.println("Ghișeul " + deskId + " s-a deschis.");
+        System.out.println("Ghiseul " + deskId + " s-a deschis.");
 
         try {
             while (running && !Thread.currentThread().isInterrupted()) {
@@ -241,7 +241,7 @@ public class DeskWorker implements Runnable {
             }
         } finally {
             this.workerThread = null;
-            System.out.println("Ghișeul " + deskId + " s-a închis.");
+            System.out.println("Ghiseul " + deskId + " s-a inchis.");
         }
     }
 }
