@@ -114,7 +114,7 @@ public class MainTest {
         t2.interrupt();
         t3.interrupt();
 
-        breakScheduler.shutdown();
+        breakScheduler.shutdownAll();
         Scheduler.resetInstance();
         RouteResolver.resetInstance();
 

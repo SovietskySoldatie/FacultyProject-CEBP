@@ -7,6 +7,7 @@ import bureaucraticSystem.config.graph.RouteResolver;
 import bureaucraticSystem.counter.DeskWorker;
 import bureaucraticSystem.counter.OfficeQueue;
 import bureaucraticSystem.resource.OfficialStamp;
+import bureaucraticSystem.resource.SafeStamp;
 import bureaucraticSystem.scheduler.FaultyScheduler;
 import bureaucraticSystem.scheduler.Scheduler;
 import bureaucraticSystem.scheduler.TicketDispatcher;
@@ -72,7 +73,7 @@ public class SchedulerFaultDemo {
         OfficeQueue[] queues = new OfficeQueue[offices.length];
         DeskWorker[] workers = new DeskWorker[offices.length];
         Thread[] workerThreads = new Thread[offices.length];
-        OfficialStamp stamp = new OfficialStamp();
+        OfficialStamp stamp = new SafeStamp();
         for (int i = 0; i < offices.length; i++) {
             queues[i] = new OfficeQueue();
             workers[i] = new DeskWorker("Desk-" + offices[i], queues[i], null, stamp);
