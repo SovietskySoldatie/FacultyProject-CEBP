@@ -36,6 +36,8 @@ public class RouteResolver {
 
     /**
      * Returnează sau configurează instanța unică cu un DocumentRegistry specificat.
+     * Atenție: un registry diferit îl înlocuiește pentru toți consumatorii
+     * singletonului.
      */
     public static RouteResolver getInstance(DocumentRegistry registry) {
         RouteResolver localInstance = instance;
@@ -70,8 +72,16 @@ public class RouteResolver {
         return registry;
     }
 
+    /**
+     * Schimbă registrul pentru TOȚI consumatorii singletonului. Pentru registre
+     * diferite în paralel folosiți metoda statică
+     * {@link #resolveNextRequiredDocument(DocumentRegistry, Set, String)}.
+     */
     public void setRegistry(DocumentRegistry registry) {
-        this.registry = Objects.requireNonNull(registry, "registry must not be null");
+        Objects.requireNonNull(registry, "registry must not be null");
+        synchronized (LOCK) {
+            this.registry = registry;
+        }
     }
 
     /**
@@ -84,7 +94,9 @@ public class RouteResolver {
 
     /**
      * Metodă statică de dataflow pur: determină primul document necesar pentru un
-     * DocumentRegistry specificat.
+     * DocumentRegistry specificat. Nu modifică starea singletonului.
+     * ownedDocs este doar citit (contains); apelantul trebuie să furnizeze un set
+     * thread-confined sau thread-safe (ex. ConcurrentHashMap.newKeySet()).
      */
     public static Optional<Document> resolveNextRequiredDocument(DocumentRegistry registry, Set<String> ownedDocs,
             String targetDocId) {
