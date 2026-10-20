@@ -45,7 +45,8 @@ public class Scheduler implements TicketDispatcher {
 
     /**
      * Returnează instanța unică (Singleton) a Scheduler-ului.
-     * Dacă Scheduler-ul nu a fost încă inițializat, firul apelant este pus în așteptare
+     * Dacă Scheduler-ul nu a fost încă inițializat, firul apelant este pus în
+     * așteptare
      * până când un alt fir inițializează instanța cu un DocumentRegistry valid.
      */
     public static Scheduler getInstance() {
@@ -53,11 +54,15 @@ public class Scheduler implements TicketDispatcher {
     }
 
     /**
-     * Returnează sau inițializează instanța unică cu un DocumentRegistry specificat.
-     * - Dacă documentRegistry == null: verifică dacă instanța a fost resetată (eșuează imediat)
-     *   sau blochează firul apelant pur determinist până la inițializare.
-     * - Dacă documentRegistry != null: blochează pe LOCK până când instanța este creată și
-     *   emite evenimentul prin CompletableFuture (instanceFuture.complete), deblocând toate firele în așteptare.
+     * Returnează sau inițializează instanța unică cu un DocumentRegistry
+     * specificat.
+     * - Dacă documentRegistry == null: verifică dacă instanța a fost resetată
+     * (eșuează imediat)
+     * sau blochează firul apelant pur determinist până la inițializare.
+     * - Dacă documentRegistry != null: blochează pe LOCK până când instanța este
+     * creată și
+     * emite evenimentul prin CompletableFuture (instanceFuture.complete), deblocând
+     * toate firele în așteptare.
      */
     public static Scheduler getInstance(DocumentRegistry documentRegistry) {
         Scheduler localInstance = instance;
@@ -73,7 +78,8 @@ public class Scheduler implements TicketDispatcher {
                 return instanceFuture.get();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new IllegalStateException("Firul a fost întrerupt în timp ce aștepta inițializarea Scheduler-ului.", e);
+                throw new IllegalStateException(
+                        "Firul a fost întrerupt în timp ce aștepta inițializarea Scheduler-ului.", e);
             } catch (ExecutionException e) {
                 Throwable cause = e.getCause();
                 String message = cause != null ? cause.getMessage() : e.getMessage();
@@ -97,9 +103,11 @@ public class Scheduler implements TicketDispatcher {
     }
 
     /**
-     * Returnează instanța unică sau așteaptă un timp maxim specificat inițializarea acesteia.
+     * Returnează instanța unică sau așteaptă un timp maxim specificat inițializarea
+     * acesteia.
      */
-    public static Scheduler getInstance(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+    public static Scheduler getInstance(long timeout, TimeUnit unit)
+            throws InterruptedException, ExecutionException, TimeoutException {
         Scheduler localInstance = instance;
         if (localInstance != null) {
             return localInstance;
@@ -115,8 +123,10 @@ public class Scheduler implements TicketDispatcher {
     }
 
     /**
-     * Reinițializează instanța Singleton (util pentru Unit Tests / scenarii de testare repetate).
-     * Transmite determinist un semnal de excepție către toate firele care așteaptă inițializarea.
+     * Reinițializează instanța Singleton (util pentru Unit Tests / scenarii de
+     * testare repetate).
+     * Transmite determinist un semnal de excepție către toate firele care așteaptă
+     * inițializarea.
      */
     public static void resetInstance() {
         synchronized (LOCK) {
@@ -173,7 +183,8 @@ public class Scheduler implements TicketDispatcher {
     }
 
     /**
-     * Metodă statică de dataflow: Alocă și plasează tichetul la coada biroului indicat.
+     * Metodă statică de dataflow: Alocă și plasează tichetul la coada biroului
+     * indicat.
      *
      * @param ticket   Tichetul creat de client
      * @param officeId ID-ul biroului la care este alocat tichetul
@@ -192,7 +203,8 @@ public class Scheduler implements TicketDispatcher {
     }
 
     /**
-     * Metodă statică de dataflow: Alocare automată pe baza registrului de documente.
+     * Metodă statică de dataflow: Alocare automată pe baza registrului de
+     * documente.
      */
     public static void dispatchTicket(ServiceTicket ticket) throws InterruptedException {
         Objects.requireNonNull(ticket, "ticket must not be null");
@@ -279,7 +291,8 @@ public class Scheduler implements TicketDispatcher {
     }
 
     /**
-     * Înregistrează și trimite o cerere în numele unui client către biroul specificat.
+     * Înregistrează și trimite o cerere în numele unui client către biroul
+     * specificat.
      */
     public boolean scheduleClient(Client client, String documentId, String officeId) throws Exception {
         Objects.requireNonNull(client, "client must not be null");
@@ -287,7 +300,8 @@ public class Scheduler implements TicketDispatcher {
     }
 
     /**
-     * Înregistrează și trimite o cerere în numele unui client, determinând biroul automat.
+     * Înregistrează și trimite o cerere în numele unui client, determinând biroul
+     * automat.
      */
     public boolean scheduleClient(Client client, String documentId) throws Exception {
         Objects.requireNonNull(client, "client must not be null");
