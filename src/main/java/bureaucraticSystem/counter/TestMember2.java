@@ -2,19 +2,22 @@ package bureaucraticSystem.counter;
 
 import bureaucraticSystem.client.request.ServiceTicket;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Test independent pentru Membru 2 (Birouri, Cozi și Ghișee).
  *
  * Validează cerințele de bază ale laboratorului:
  *  1. Coada blocantă OfficeQueue (LinkedBlockingQueue fără busy-waiting).
- *  2. Modelul Producer-Consumer: 2 ghișee paralele care deservesc aceeași coadă.
+ *  2. Modelul Producer-Consumer: 2 ghișee paralele care deservesc simultan aceeași coadă.
  *  3. Handshake-ul asincron prin ServiceTicket (waitForCompletion / markCompleted).
- *  4. Oprirea curată a worker-ilor (Graceful Shutdown cu volatile și interrupt).
+ *  4. Oprirea curată a worker-ilor (Graceful Shutdown prin stop() cu auto-interrupt).
  */
 public class TestMember2 {
 
     public static void main(String[] args) throws Exception {
-        System.out.println("=== Pornire TestMember2: Cozi & Ghișee (Worker Pool) ===\n");
+        System.out.println("=== Pornire TestMember2: Cozi & Ghișee (Worker Pool Paralel) ===\n");
 
         // 1. Creăm coada unică a biroului
         OfficeQueue queue = new OfficeQueue();
@@ -29,32 +32,32 @@ public class TestMember2 {
         threadDesk1.start();
         threadDesk2.start();
 
-        // 3. Trimitem 4 clienți la birou
+        // 3. Adăugăm toate cele 4 tichete în coadă simultan pentru ca ambele ghișee să lucreze în paralel
+        List<ServiceTicket> tickets = new ArrayList<>();
         for (int i = 1; i <= 4; i++) {
             String clientName = "Client-" + i;
             ServiceTicket tichet = new ServiceTicket(clientName, "CertificatNastere");
+            tickets.add(tichet);
 
             System.out.println(">> " + clientName + " se așază la coada biroului.");
             queue.addTicket(tichet);
+        }
 
-            // Clientul așteaptă până când unul dintre cele două ghișee îi rezolvă actul
+        // 4. Așteptăm finalizarea fiecărui tichet procesat în paralel de cele două ghișee
+        for (ServiceTicket tichet : tickets) {
             boolean actFinalizat = tichet.waitForCompletion();
-
             if (actFinalizat) {
-                System.out.println("<< " + clientName + " și-a primit actul și pleacă mulțumit!\n");
+                System.out.println("<< " + tichet.getClientId() + " și-a primit actul și pleacă mulțumit!");
             }
         }
 
-        // 4. Închidere curată a ambelor ghișee (Graceful Shutdown)
+        // 5. Închidere curată a ambelor ghișee (stop() setează running=false și trezește automat firul blocat)
         desk1.stop();
         desk2.stop();
-
-        threadDesk1.interrupt();
-        threadDesk2.interrupt();
 
         threadDesk1.join(2000);
         threadDesk2.join(2000);
 
-        System.out.println("=== TestMember2 finalizat cu succes! ===");
+        System.out.println("\n=== TestMember2 finalizat cu succes! ===");
     }
 }
