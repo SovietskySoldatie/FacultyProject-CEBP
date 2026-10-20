@@ -5,17 +5,15 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class CoffeeBreakScheduler {
+    // Thread pool pentru toate ghișeele
     private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(4);
 
-    /**
-     * Clasa de stare per-ghișeu cerută în Code Review.
-     * Reține starea booleană, dar și referințele către task-urile planificate,
-     * pentru a putea fi anulate dacă se suprapun.
-     */
     private static class DeskState {
         final AtomicBoolean onBreak = new AtomicBoolean(false);
         ScheduledFuture<?> mainCycleTask;
         ScheduledFuture<?> resetTask;
+        // Generation token
+        long generation = 0;
     }
 
     private final Map<String, DeskState> deskStates = new ConcurrentHashMap<>();
@@ -34,54 +32,77 @@ public class CoffeeBreakScheduler {
     }
 
     public void startScheduler(String deskId, long intervalSec, long breakDurationSec) {
-        if (deskId == null) {
-            throw new IllegalArgumentException("deskId can't be null");
-        }
+        if (deskId == null) throw new IllegalArgumentException("deskId can't be null");
         if (intervalSec <= 0 || breakDurationSec <= 0) {
             throw new IllegalArgumentException("Intervals must be positive");
         }
-        // Validarea cerută: pauza nu poate fi mai lungă sau egală cu intervalul
         if (breakDurationSec >= intervalSec) {
-            throw new IllegalArgumentException("Break can't be longer than interval!");
+            throw new IllegalArgumentException("Break should take less than interval!");
         }
 
         DeskState state = deskStates.get(deskId);
         if (state == null) {
-            throw new IllegalStateException("Desk " + deskId + " is not registered.");
+            throw new IllegalStateException("Desk " + deskId + " not registered.");
         }
 
-        // Sincronizăm pe starea ghișeului pentru a preveni race conditions
-        // în cazul în care startScheduler e apelat de mai multe ori simultan
         synchronized (state) {
-            // Dacă există deja o planificare pentru acest ghișeu, o anulăm pe cea veche
+            state.generation++;
+            final long currentGen = state.generation;
+
             if (state.mainCycleTask != null && !state.mainCycleTask.isCancelled()) {
                 state.mainCycleTask.cancel(false);
             }
             if (state.resetTask != null && !state.resetTask.isCancelled()) {
                 state.resetTask.cancel(false);
             }
+
             state.onBreak.set(false);
 
-            // Planificăm noul ciclu
             state.mainCycleTask = executor.scheduleWithFixedDelay(() -> {
                 synchronized (state) {
-                    // Dacă dintr-un motiv neprevăzut e deja în pauză, ignorăm declanșarea
+                    // Dacă acest ciclu recurent aparține unei planificări vechi, îl ignorăm
+                    if (state.generation != currentGen) return;
                     if (state.onBreak.get()) return;
 
                     state.onBreak.set(true);
-                    System.out.println(deskId + " entered coffee break!");
+                    System.out.println(deskId + " is on coffee break!");
 
-                    // Planificăm task-ul care îl va scoate din pauză
                     state.resetTask = executor.schedule(() -> {
-                        state.onBreak.set(false);
-                        System.out.println(deskId + " is back from coffee break.");
+                        synchronized (state) {
+                            // VERIFICAREA CHEIE: Doar dacă generația este aceeași, modificăm starea
+                            if (state.generation == currentGen) {
+                                state.onBreak.set(false);
+                                System.out.println(" 🏢 " + deskId + " is back from coffee break.");
+                            }
+                        }
                     }, breakDurationSec, TimeUnit.SECONDS);
                 }
             }, intervalSec, intervalSec, TimeUnit.SECONDS);
         }
     }
 
-    public void shutdown() {
+    /**
+     * Oprește planificarea pauzelor strict pentru un singur ghișeu,
+     * lăsând restul instituției neafectată.
+     */
+    public void stopDeskBreaks(String deskId) {
+        if (deskId == null) return;
+        DeskState state = deskStates.get(deskId);
+        if (state != null) {
+            synchronized (state) {
+                state.generation++; // Invalidează orice task aflat în așteptare
+                if (state.mainCycleTask != null) state.mainCycleTask.cancel(false);
+                if (state.resetTask != null) state.resetTask.cancel(false);
+                state.onBreak.set(false);
+            }
+        }
+    }
+
+    /**
+     * Oprește complet executorul global pentru TOATE ghișeele.
+     * Utilizat doar la închiderea sistemului (System Shutdown).
+     */
+    public void shutdownAll() {
         executor.shutdownNow();
     }
 }
