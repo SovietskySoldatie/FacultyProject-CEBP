@@ -96,3 +96,7 @@ java -cp target/classes bureaucraticSystem.demo.Demo COUNTER 100
 java -cp target/classes bureaucraticSystem.demo.Demo DEADLOCK 10 true
 ```
 
+
+
+Kind regards,
+![Real scrum master](./.important/RealScrumBTW.jpeg)
