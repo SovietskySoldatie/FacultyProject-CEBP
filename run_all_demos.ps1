@@ -1,0 +1,71 @@
+param (
+    [int]$ClientCount = 100
+)
+
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $ScriptDir
+
+$LogsDir = Join-Path $ScriptDir "logs"
+if (-not (Test-Path $LogsDir)) {
+    New-Item -ItemType Directory -Path $LogsDir | Out-Null
+}
+
+$DeadlockTimeoutSeconds = 300 # 5 minutes
+
+Write-Host "=================================================================" -ForegroundColor Cyan
+Write-Host " Starting Bureaucratic System Demos Execution" -ForegroundColor Cyan
+Write-Host " Citizens per scenario: $ClientCount"
+Write-Host " Logs destination:      $LogsDir"
+Write-Host " Deadlock Guard:        Active ONLY for DEADLOCK (Timeout: ${DeadlockTimeoutSeconds}s)"
+Write-Host "=================================================================" -ForegroundColor Cyan
+
+# Compile project before running
+Write-Host "[Build] Compiling project with Maven..." -ForegroundColor Yellow
+mvn compile -q
+
+function Run-DemoScenario {
+    param (
+        [string]$Mode,
+        [string]$Guard,
+        [string]$Timeout,
+        [string]$LogFileName
+    )
+
+    $LogPath = Join-Path $LogsDir $LogFileName
+    Write-Host ""
+    Write-Host "-----------------------------------------------------------------" -ForegroundColor Green
+    Write-Host ">>> Running Demo: $Mode (Guard: $Guard, Timeout: $(if ($Timeout) { $Timeout + 's' } else { 'N/A' }))" -ForegroundColor Green
+    Write-Host ">>> Output log:   $LogPath"
+    Write-Host "-----------------------------------------------------------------" -ForegroundColor Green
+
+    if ($Guard -eq "true") {
+        java -cp target/classes bureaucraticSystem.demo.Demo $Mode $ClientCount $Guard $Timeout 2>&1 | Tee-Object -FilePath $LogPath -Encoding utf8
+    } else {
+        java -cp target/classes bureaucraticSystem.demo.Demo $Mode $ClientCount $Guard 2>&1 | Tee-Object -FilePath $LogPath -Encoding utf8
+    }
+
+    Write-Host ">>> Completed $Mode. Log saved to $LogPath" -ForegroundColor Green
+    Start-Sleep -Seconds 1
+}
+
+# 1. ALL_GOOD
+Run-DemoScenario -Mode "ALL_GOOD" -Guard "false" -Timeout "" -LogFileName "all_good.log"
+
+# 2. RACE_CONDITION_SCHEDULER
+Run-DemoScenario -Mode "RACE_CONDITION_SCHEDULER" -Guard "false" -Timeout "" -LogFileName "race_condition_scheduler.log"
+
+# 3. RACE_CONDITION_QUEUE
+Run-DemoScenario -Mode "RACE_CONDITION_QUEUE" -Guard "false" -Timeout "" -LogFileName "race_condition_queue.log"
+
+# 4. RACE_CONDITION_COUNTER
+Run-DemoScenario -Mode "RACE_CONDITION_COUNTER" -Guard "false" -Timeout "" -LogFileName "race_condition_counter.log"
+
+# 5. DEADLOCK (Deadlock Guard active with 300s / 5min runtime)
+Run-DemoScenario -Mode "DEADLOCK" -Guard "true" -Timeout $DeadlockTimeoutSeconds -LogFileName "deadlock.log"
+
+Write-Host ""
+Write-Host "=================================================================" -ForegroundColor Cyan
+Write-Host " All 5 demos have finished executing!" -ForegroundColor Cyan
+Write-Host " Log files created in '$LogsDir':"
+Get-ChildItem -Path $LogsDir | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
+Write-Host "=================================================================" -ForegroundColor Cyan
