@@ -2,6 +2,7 @@ package bureaucraticSystem.resource;
 
 import bureaucraticSystem.client.Client;
 import bureaucraticSystem.counter.DeskWorker;
+import bureaucraticSystem.counter.DeskWorkerSafe;
 import bureaucraticSystem.counter.OfficeQueue;
 
 import java.util.ArrayList;
@@ -11,8 +12,8 @@ public class Test {
     static void useCounterAndStamp(OfficialStamp stamp, DocumentCounter counter) throws InterruptedException {
         OfficeQueue queue = new OfficeQueue();
 
-        DeskWorker worker1 = new DeskWorker("Desk-1-StareaCivila", queue, null, stamp, counter, true);
-        DeskWorker worker2 = new DeskWorker("Desk-2-StareaCivila", queue, null, stamp, counter, false);
+        DeskWorker worker1 = new DeskWorkerSafe("Desk-1-StareaCivila", queue, null, stamp, counter, true);
+        DeskWorker worker2 = new DeskWorkerSafe("Desk-2-StareaCivila", queue, null, stamp, counter, false);
 
         Thread t1 = new Thread(worker1, worker1.getDeskId());
         Thread t2 = new Thread(worker2, worker2.getDeskId());

@@ -23,8 +23,8 @@ public class TestMember2 {
         OfficeQueue queue = new OfficeQueue();
 
         // 2. Deschidem două ghișee paralele la același birou (cerință oficială din temă)
-        DeskWorker desk1 = new DeskWorker("Desk-1", queue);
-        DeskWorker desk2 = new DeskWorker("Desk-2", queue);
+        DeskWorker desk1 = new DeskWorkerSafe("Desk-1", queue);
+        DeskWorker desk2 = new DeskWorkerSafe("Desk-2", queue);
 
         Thread threadDesk1 = new Thread(desk1, "Thread-Desk-1");
         Thread threadDesk2 = new Thread(desk2, "Thread-Desk-2");

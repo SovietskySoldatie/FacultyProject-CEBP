@@ -6,6 +6,8 @@ import bureaucraticSystem.config.data.DocumentRegistry;
 import bureaucraticSystem.config.graph.RouteResolver;
 import bureaucraticSystem.counter.BlockingOfficeQueue;
 import bureaucraticSystem.counter.DeskWorker;
+import bureaucraticSystem.counter.DeskWorkerSafe;
+import bureaucraticSystem.counter.DeskWorkerUnsafe;
 import bureaucraticSystem.counter.FaultyOfficeQueue;
 import bureaucraticSystem.counter.OfficeQueue;
 import bureaucraticSystem.resource.CoffeeBreakScheduler;
@@ -188,8 +190,17 @@ public class Demo {
     }
 
     /**
-     * Overload complet ce permite si injectarea tipului de coada (BlockingOfficeQueue.class / FaultyOfficeQueue.class).
+     * Overload complet ce permite si injectarea tipului de coada si de worker (Safe/Unsafe).
      */
+    public void demo(Class<? extends TicketDispatcher> dispatcherClass,
+                     Class<? extends OfficialStamp> stampClass,
+                     Class<? extends DocumentCounter> counterClass,
+                     Class<? extends OfficeQueue> queueClass,
+                     Class<? extends DeskWorker> workerClass,
+                     int clientCount) throws Exception {
+        executeSimulation(dispatcherClass, stampClass, counterClass, queueClass, workerClass, clientCount);
+    }
+
     public void demo(Class<? extends TicketDispatcher> dispatcherClass,
                      Class<? extends OfficialStamp> stampClass,
                      Class<? extends DocumentCounter> counterClass,
@@ -252,6 +263,18 @@ public class Demo {
             return new BlockingOfficeQueue();
         }
         return queueClass.getDeclaredConstructor().newInstance();
+    }
+
+    protected static DeskWorker createWorker(Class<? extends DeskWorker> workerClass,
+                                             String deskId, OfficeQueue queue,
+                                             CoffeeBreakScheduler breakScheduler,
+                                             OfficialStamp stamp, DocumentCounter counter,
+                                             boolean stampFirst) throws Exception {
+        Class<? extends DeskWorker> targetClass = (workerClass != null) ? workerClass : DeskWorkerSafe.class;
+        Constructor<? extends DeskWorker> ctor = targetClass.getConstructor(
+                String.class, OfficeQueue.class, CoffeeBreakScheduler.class,
+                OfficialStamp.class, DocumentCounter.class, boolean.class);
+        return ctor.newInstance(deskId, queue, breakScheduler, stamp, counter, stampFirst);
     }
 
     @SuppressWarnings("unchecked")
@@ -345,11 +368,28 @@ public class Demo {
                                      Class<? extends DocumentCounter> counterClass,
                                      Class<? extends OfficeQueue> queueClass,
                                      int clientCount) throws Exception {
+        Class<? extends DeskWorker> workerClass = (counterClass != null && UnsafeCounter.class.isAssignableFrom(counterClass) && SafeStamp.class.isAssignableFrom(stampClass))
+                ? DeskWorkerUnsafe.class
+                : DeskWorkerSafe.class;
+        executeSimulation(dispatcherClass, stampClass, counterClass, queueClass, workerClass, clientCount);
+    }
+
+    protected void executeSimulation(Class<? extends TicketDispatcher> dispatcherClass,
+                                     Class<? extends OfficialStamp> stampClass,
+                                     Class<? extends DocumentCounter> counterClass,
+                                     Class<? extends OfficeQueue> queueClass,
+                                     Class<? extends DeskWorker> workerClass,
+                                     int clientCount) throws Exception {
         Objects.requireNonNull(dispatcherClass, "dispatcherClass must not be null");
         Objects.requireNonNull(stampClass, "stampClass must not be null");
         Objects.requireNonNull(counterClass, "counterClass must not be null");
         if (queueClass == null) {
             queueClass = BlockingOfficeQueue.class;
+        }
+        if (workerClass == null) {
+            workerClass = (UnsafeCounter.class.isAssignableFrom(counterClass) && SafeStamp.class.isAssignableFrom(stampClass))
+                    ? DeskWorkerUnsafe.class
+                    : DeskWorkerSafe.class;
         }
         if (clientCount <= 0) {
             clientCount = getDefaultClientCount();
@@ -367,6 +407,7 @@ public class Demo {
         System.out.println("[" + LocalTime.now() + "] Clasa Stampila:             " + stampClass.getSimpleName());
         System.out.println("[" + LocalTime.now() + "] Clasa Contor:              " + counterClass.getSimpleName());
         System.out.println("[" + LocalTime.now() + "] Clasa Cozi de birou:       " + queueClass.getSimpleName());
+        System.out.println("[" + LocalTime.now() + "] Clasa Ghisee (Worker):      " + workerClass.getSimpleName());
         System.out.println("[" + LocalTime.now() + "] ---------------------------------------------------------------\n");
 
         // -------------------------------------------------------------
@@ -457,16 +498,16 @@ public class Demo {
         List<DeskWorker> workers = new ArrayList<>();
         List<Thread> workerThreads = new ArrayList<>();
 
-        DeskWorker w1 = new DeskWorker("Desk-StareaCivila", stareaCivilaQueue, breakScheduler, stamp, counter, true);
-        DeskWorker w2 = new DeskWorker("Desk-ANAF-1", anafQueue, breakScheduler, stamp, counter, true);
-        DeskWorker w3 = new DeskWorker("Desk-ANAF-2", anafQueue, breakScheduler, stamp, counter, false);
-        DeskWorker w4 = new DeskWorker("Desk-Politie", politieQueue, breakScheduler, stamp, counter, true);
-        DeskWorker w5 = new DeskWorker("Desk-EvidentaPopulatiei-1", evidentaPopulatieiQueue, breakScheduler, stamp, counter, true);
-        DeskWorker w6 = new DeskWorker("Desk-EvidentaPopulatiei-2", evidentaPopulatieiQueue, breakScheduler, stamp, counter, true);
-        DeskWorker w7 = new DeskWorker("Desk-Primarie", primarieQueue, breakScheduler, stamp, counter, true);
-        DeskWorker w8 = new DeskWorker("Desk-DirectiaSanatate", directiaSanatateQueue, breakScheduler, stamp, counter, true);
-        DeskWorker w9 = new DeskWorker("Desk-Pasapoarte-1", pasapoarteQueue, breakScheduler, stamp, counter, true);
-        DeskWorker w10 = new DeskWorker("Desk-Pasapoarte-2", pasapoarteQueue, breakScheduler, stamp, counter, true);
+        DeskWorker w1 = createWorker(workerClass, "Desk-StareaCivila", stareaCivilaQueue, breakScheduler, stamp, counter, true);
+        DeskWorker w2 = createWorker(workerClass, "Desk-ANAF-1", anafQueue, breakScheduler, stamp, counter, true);
+        DeskWorker w3 = createWorker(workerClass, "Desk-ANAF-2", anafQueue, breakScheduler, stamp, counter, false);
+        DeskWorker w4 = createWorker(workerClass, "Desk-Politie", politieQueue, breakScheduler, stamp, counter, true);
+        DeskWorker w5 = createWorker(workerClass, "Desk-EvidentaPopulatiei-1", evidentaPopulatieiQueue, breakScheduler, stamp, counter, true);
+        DeskWorker w6 = createWorker(workerClass, "Desk-EvidentaPopulatiei-2", evidentaPopulatieiQueue, breakScheduler, stamp, counter, true);
+        DeskWorker w7 = createWorker(workerClass, "Desk-Primarie", primarieQueue, breakScheduler, stamp, counter, true);
+        DeskWorker w8 = createWorker(workerClass, "Desk-DirectiaSanatate", directiaSanatateQueue, breakScheduler, stamp, counter, true);
+        DeskWorker w9 = createWorker(workerClass, "Desk-Pasapoarte-1", pasapoarteQueue, breakScheduler, stamp, counter, true);
+        DeskWorker w10 = createWorker(workerClass, "Desk-Pasapoarte-2", pasapoarteQueue, breakScheduler, stamp, counter, true);
 
         Collections.addAll(workers, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10);
 
@@ -687,10 +728,11 @@ public class Demo {
                 System.out.println("\n[" + LocalTime.now() + "] ===============================================================");
                 System.out.println("[" + LocalTime.now() + "] === 4. DEMO: RACE CONDITION - DOCUMENT COUNTER (LOST UPDATES) ===");
                 System.out.println("[" + LocalTime.now() + "] ===    UnsafeCounter (count++ nesincronizat)                ===");
+                System.out.println("[" + LocalTime.now() + "] ===    DeskWorkerUnsafe (apel neprotejat la contor)         ===");
                 System.out.println("[" + LocalTime.now() + "] ===    SafeStamp (evita deadlock) + UnsafeCounter           ===");
                 System.out.println("[" + LocalTime.now() + "] ===    Demonstreaza: Pierderi de inregistrari la concurenta  ===");
                 System.out.println("[" + LocalTime.now() + "] ===============================================================");
-                demo(Scheduler.class, SafeStamp.class, UnsafeCounter.class, BlockingOfficeQueue.class, count);
+                demo(Scheduler.class, SafeStamp.class, UnsafeCounter.class, BlockingOfficeQueue.class, DeskWorkerUnsafe.class, count);
             }
             case DEADLOCK -> {
                 System.out.println("\n[" + LocalTime.now() + "] ===============================================================");
