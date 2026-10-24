@@ -1,4 +1,5 @@
 package bureaucraticSystem.resource;
+import java.time.LocalTime;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -22,7 +23,7 @@ public class SafeCounter implements DocumentCounter {
         lock.lock();
         try {
             count++;
-            System.out.println("Safe Counter: " + deskId + " registered. Total office: " + count);
+            System.out.println("[" + LocalTime.now() + "] Safe Counter: " + deskId + " registered. Total office: " + count);
             return count;
         } finally {
             lock.unlock();

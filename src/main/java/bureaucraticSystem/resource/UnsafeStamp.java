@@ -1,4 +1,5 @@
 package bureaucraticSystem.resource;
+import java.time.LocalTime;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class UnsafeStamp implements OfficialStamp {
@@ -19,7 +20,7 @@ public class UnsafeStamp implements OfficialStamp {
 
     @Override
     public void simulateUsage(String deskId, long durationMs) throws InterruptedException {
-        System.out.println("Unsafe Stamp: " + deskId + " uses stamp...");
+        System.out.println("[" + LocalTime.now() + "] Unsafe Stamp: " + deskId + " uses stamp...");
         Thread.sleep(durationMs);
     }
 }

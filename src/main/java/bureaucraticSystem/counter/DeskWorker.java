@@ -6,6 +6,7 @@ import bureaucraticSystem.resource.CoffeeBreakScheduler;
 import bureaucraticSystem.resource.DocumentCounter;
 import bureaucraticSystem.resource.OfficialStamp;
 
+import java.time.LocalTime;
 import java.util.Objects;
 import java.util.Set;
 
@@ -85,7 +86,7 @@ public class DeskWorker implements Runnable {
      */
     protected void waitWhileOnCoffeeBreak() throws InterruptedException {
         while (running && breakScheduler != null && breakScheduler.isOnBreak(deskId)) {
-            System.out.println(deskId + " is on coffee break. Please wait...");
+            System.out.println("[" + LocalTime.now() + "] " + deskId + " is on coffee break. Please wait...");
             Thread.sleep(COFFEE_BREAK_POLL_MS);
         }
     }
@@ -153,7 +154,7 @@ public class DeskWorker implements Runnable {
                             documentCounter.releaseCounter();
                         }
                     } else {
-                        System.out.println(deskId + ": Counter locked, release stamp to avoid deadlock and try again...");
+                        System.out.println("[" + LocalTime.now() + "] " + deskId + ": Counter locked, release stamp to avoid deadlock and try again...");
                     }
                 } finally {
                     stamp.releaseStamp();
@@ -171,7 +172,7 @@ public class DeskWorker implements Runnable {
                             stamp.releaseStamp();
                         }
                     } else {
-                        System.out.println(deskId + ": Stamp locked, release counter to avoid deadlock and try again...");
+                        System.out.println("[" + LocalTime.now() + "] " + deskId + ": Stamp locked, release counter to avoid deadlock and try again...");
                     }
                 } finally {
                     documentCounter.releaseCounter();
@@ -210,7 +211,7 @@ public class DeskWorker implements Runnable {
     @Override
     public void run() {
         this.workerThread = Thread.currentThread();
-        System.out.println("Ghiseul " + deskId + " s-a deschis.");
+        System.out.println("[" + LocalTime.now() + "] Ghiseul " + deskId + " s-a deschis.");
 
         try {
             while (running && !Thread.currentThread().isInterrupted()) {
@@ -229,7 +230,7 @@ public class DeskWorker implements Runnable {
                     if (ticket == null) {
                         continue;
                     }
-                    System.out.println(deskId + " a preluat clientul: " + ticket.getClientId());
+                    System.out.println("[" + LocalTime.now() + "] " + deskId + " a preluat clientul: " + ticket.getClientId());
 
                     // 3. Procesează efectiv cererea
                     processTicket(ticket);
@@ -248,7 +249,7 @@ public class DeskWorker implements Runnable {
             }
         } finally {
             this.workerThread = null;
-            System.out.println("Ghiseul " + deskId + " s-a inchis.");
+            System.out.println("[" + LocalTime.now() + "] Ghiseul " + deskId + " s-a inchis.");
         }
     }
 }

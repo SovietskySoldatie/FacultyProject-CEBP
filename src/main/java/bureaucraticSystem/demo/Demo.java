@@ -19,6 +19,7 @@ import bureaucraticSystem.scheduler.FaultyScheduler;
 import bureaucraticSystem.scheduler.Scheduler;
 import bureaucraticSystem.scheduler.TicketDispatcher;
 
+import java.time.LocalTime;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -358,15 +359,15 @@ public class Demo {
         resetDispatcher(dispatcherClass);
         RouteResolver.resetInstance();
 
-        System.out.println("===============================================================");
-        System.out.println("=== Incepere Simulare Sistem Birocratic (Demo) ===");
-        System.out.println("===============================================================");
-        System.out.printf("Numar cetateni concurenti: %d (50%% %s, 50%% %s)\n", clientCount, FINAL_DOCUMENT_ID_PASAPORT, FINAL_DOCUMENT_ID_PUZ);
-        System.out.println("Clasa Dispecerat:           " + dispatcherClass.getSimpleName());
-        System.out.println("Clasa Stampila:             " + stampClass.getSimpleName());
-        System.out.println("Clasa Contor:              " + counterClass.getSimpleName());
-        System.out.println("Clasa Cozi de birou:       " + queueClass.getSimpleName());
-        System.out.println("---------------------------------------------------------------\n");
+        System.out.println("\n[" + LocalTime.now() + "] ===============================================================");
+        System.out.println("[" + LocalTime.now() + "] === Incepere Simulare Sistem Birocratic (Demo) ===");
+        System.out.println("[" + LocalTime.now() + "] ===============================================================");
+        System.out.printf("[" + LocalTime.now() + "] Numar cetateni concurenti: %d (50%% %s, 50%% %s)\n", clientCount, FINAL_DOCUMENT_ID_PASAPORT, FINAL_DOCUMENT_ID_PUZ);
+        System.out.println("[" + LocalTime.now() + "] Clasa Dispecerat:           " + dispatcherClass.getSimpleName());
+        System.out.println("[" + LocalTime.now() + "] Clasa Stampila:             " + stampClass.getSimpleName());
+        System.out.println("[" + LocalTime.now() + "] Clasa Contor:              " + counterClass.getSimpleName());
+        System.out.println("[" + LocalTime.now() + "] Clasa Cozi de birou:       " + queueClass.getSimpleName());
+        System.out.println("[" + LocalTime.now() + "] ---------------------------------------------------------------\n");
 
         // -------------------------------------------------------------
         // 1. GRAFUL DE DOCUMENTE (11 acte pe 4 niveluri de dependente)
@@ -416,7 +417,7 @@ public class Demo {
                 setupDispatcher.registerOffice(OFFICE_DIRECTIA_SANATATE, directiaSanatateQueue);
                 setupDispatcher.registerOffice(OFFICE_PASAPOARTE, pasapoarteQueue);
             } catch (Exception e) {
-                System.err.println("[Setup] Eroare la inregistrarea birourilor: " + e.getMessage());
+                System.err.println("[" + LocalTime.now() + "] [Setup] Eroare la inregistrarea birourilor: " + e.getMessage());
             } finally {
                 officesReady.countDown();
             }
@@ -475,7 +476,7 @@ public class Demo {
             wt.start();
         }
 
-        System.out.println("--- Institutia s-a deschis. Angajatii sunt la ghisee! ---\n");
+        System.out.println("[" + LocalTime.now() + "] --- Institutia s-a deschis. Angajatii sunt la ghisee! ---\n");
         Thread.sleep(500);
 
         // -------------------------------------------------------------
@@ -509,7 +510,7 @@ public class Demo {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 } catch (Exception e) {
-                    System.err.println("Eroare la pornire client Cetatean-" + clientIndex + ": " + e.getMessage());
+                    System.err.println("[" + LocalTime.now() + "] Eroare la pornire client Cetatean-" + clientIndex + ": " + e.getMessage());
                 }
             }, "Thread-Cetatean-" + clientIndex);
             clientThreads.add(ct);
@@ -519,7 +520,7 @@ public class Demo {
         // Asteptam ca birourile sa fie inregistrate in setup
         officesReady.await(5, TimeUnit.SECONDS);
 
-        System.out.printf("--- Au sosit %d cetateni simultan la ghisee (50%% Pasaport, 50%% PUZ)! ---\n", clientCount);
+        System.out.printf("[" + LocalTime.now() + "] --- Au sosit %d cetateni simultan la ghisee (50%% Pasaport, 50%% PUZ)! ---\n", clientCount);
         startGate.countDown(); // Eliberam toti clientii simultan
 
         // -------------------------------------------------------------
@@ -535,12 +536,25 @@ public class Demo {
                     timeoutMs = Math.max(45_000L, estimatedMs);
                 }
                 long deadlineMs = System.currentTimeMillis() + timeoutMs;
+                System.out.printf("[" + LocalTime.now() + "] [Deadlock Guard] Activ - limita maxima de asteptare: %d secunde.\n", timeoutMs / 1000L);
 
+                boolean timedOut = false;
                 for (Thread ct : clientThreads) {
                     long remainingMs = deadlineMs - System.currentTimeMillis();
                     if (remainingMs > 0) {
                         ct.join(remainingMs);
+                    } else if (ct.isAlive()) {
+                        timedOut = true;
                     }
+                }
+
+                if (timedOut || System.currentTimeMillis() >= deadlineMs) {
+                    System.err.printf("\n[" + LocalTime.now() + "] [DEADLOCK GUARD TRIGGERED] Timeout-ul defensiv de %d secunde a EXPIRAT!\n" +
+                            "  -> A fost detectat blocaj concurent (Deadlock / Circular Wait pe resurse partajate) la ora %s!\n" +
+                            "  -> Se declanseaza oprirea fortata si raportul de diagnostic.\n",
+                            timeoutMs / 1000L, LocalTime.now());
+                } else {
+                    System.out.println("[" + LocalTime.now() + "] [Deadlock Guard] Toti cetatenii au finalizat inainte de expirarea timeout-ului.");
                 }
             } else {
                 // Deadlock Guard dezactivat: asteptare nedefinita (in caz de Deadlock, executia ramane blocata)
@@ -566,36 +580,36 @@ public class Demo {
             long completedCount = completedPasaport + completedPUZ;
             long stuckClients = clientCount - completedCount;
 
-            System.out.println("\n---------------------------------------------------------------");
-            System.out.println("=== REZULTATE SIMULARE ===");
-            System.out.println("---------------------------------------------------------------");
-            System.out.printf("Dispeceri unici instantiati: %d (ar trebui 1)\n", distinctDispatchers.size());
-            System.out.printf("Cetateni finalizati pentru %s: %d / %d\n", FINAL_DOCUMENT_ID_PASAPORT, completedPasaport, totalPasaport);
-            System.out.printf("Cetateni finalizati pentru %s: %d / %d\n", FINAL_DOCUMENT_ID_PUZ, completedPUZ, totalPUZ);
-            System.out.printf("Total cetateni finalizati: %d / %d\n", completedCount, clientCount);
-            System.out.println("Documente inregistrate de contor: " + counter.getCount());
+            System.out.println("\n[" + LocalTime.now() + "] ---------------------------------------------------------------");
+            System.out.println("[" + LocalTime.now() + "] === REZULTATE SIMULARE ===");
+            System.out.println("[" + LocalTime.now() + "] ---------------------------------------------------------------");
+            System.out.printf("[" + LocalTime.now() + "] Dispeceri unici instantiati: %d (ar trebui 1)\n", distinctDispatchers.size());
+            System.out.printf("[" + LocalTime.now() + "] Cetateni finalizati pentru %s: %d / %d\n", FINAL_DOCUMENT_ID_PASAPORT, completedPasaport, totalPasaport);
+            System.out.printf("[" + LocalTime.now() + "] Cetateni finalizati pentru %s: %d / %d\n", FINAL_DOCUMENT_ID_PUZ, completedPUZ, totalPUZ);
+            System.out.printf("[" + LocalTime.now() + "] Total cetateni finalizati: %d / %d\n", completedCount, clientCount);
+            System.out.println("[" + LocalTime.now() + "] Documente inregistrate de contor: " + counter.getCount());
 
             if (distinctDispatchers.size() > 1) {
-                System.out.printf("[FAULT CONFIRMAT] Singleton-ul %s a fost instantiat de %d ori din cauza cursei critice (Race Condition)!\n" +
+                System.out.printf("[" + LocalTime.now() + "] [FAULT CONFIRMAT] Singleton-ul %s a fost instantiat de %d ori din cauza cursei critice (Race Condition)!\n" +
                         "  -> Birourile au fost inregistrate intr-o instanta, iar clientii au primit alte instante goale.\n",
                         dispatcherClass.getSimpleName(), distinctDispatchers.size());
             }
 
             if (stuckClients > 0) {
-                System.out.printf("[ALERTA FAULT DETECTAT] %d cetateni nu au reusit sa finalizeze actul in timpul alocat!\n", stuckClients);
-                System.out.println("Posibile cauze:\n" +
+                System.out.printf("[" + LocalTime.now() + "] [ALERTA FAULT DETECTAT] %d cetateni nu au reusit sa finalizeze actul in timpul alocat!\n", stuckClients);
+                System.out.println("[" + LocalTime.now() + "] Posibile cauze:\n" +
                         " - Deadlock intre ghisee concurente pe stampila si contor (UnsafeStamp/UnsafeCounter)\n" +
                         " - Pierderi de tichete / race condition pe coada (FaultyOfficeQueue)\n" +
                         " - Incoerenta dispecerului singleton (FaultyScheduler)\n");
             } else {
-                System.out.println("[SUCCES] Toti cetatenii si-au primit documentele cu succes!");
+                System.out.println("[" + LocalTime.now() + "] [SUCCES] Toti cetatenii si-au primit documentele cu succes!");
             }
 
         } finally {
             // ---------------------------------------------------------
             // 7. INCHIDERE CURATA (Graceful Shutdown)
             // ---------------------------------------------------------
-            System.out.println("\n--- Oprire curata a tuturor firelor de executie si resurselor ---");
+            System.out.println("\n[" + LocalTime.now() + "] --- Oprire curata a tuturor firelor de executie si resurselor ---");
             breakScheduler.shutdownAll();
             for (DeskWorker w : workers) {
                 w.stop();
@@ -631,7 +645,7 @@ public class Demo {
             resetDispatcher(dispatcherClass);
             RouteResolver.resetInstance();
 
-            System.out.println("=== Simulare incheiata ===\n");
+            System.out.println("[" + LocalTime.now() + "] === Simulare incheiata ===\n");
         }
     }
 
@@ -647,49 +661,49 @@ public class Demo {
 
         switch (target) {
             case ALL_GOOD -> {
-                System.out.println("\n===============================================================");
-                System.out.println("=== 1. DEMO: ALL-GOOD (Toate subsistemele sunt thread-safe) ===");
-                System.out.println("===    Scheduler (Singleton DCL) + SafeStamp + SafeCounter + BlockingOfficeQueue ===");
-                System.out.println("===============================================================");
+                System.out.println("\n[" + LocalTime.now() + "] ===============================================================");
+                System.out.println("[" + LocalTime.now() + "] === 1. DEMO: ALL-GOOD (Toate subsistemele sunt thread-safe) ===");
+                System.out.println("[" + LocalTime.now() + "] ===    Scheduler (Singleton DCL) + SafeStamp + SafeCounter + BlockingOfficeQueue ===");
+                System.out.println("[" + LocalTime.now() + "] ===============================================================");
                 demo(Scheduler.class, SafeStamp.class, SafeCounter.class, BlockingOfficeQueue.class, count);
             }
             case RACE_CONDITION_SCHEDULER -> {
-                System.out.println("\n===============================================================");
-                System.out.println("=== 2. DEMO: RACE CONDITION - SCHEDULER (SINGLETON FAULT)   ===");
-                System.out.println("===    FaultyScheduler (Check-then-act nesincronizat)       ===");
-                System.out.println("===    Demonstreaza: Multi-instantiere si cozi inexistente  ===");
-                System.out.println("===============================================================");
+                System.out.println("\n[" + LocalTime.now() + "] ===============================================================");
+                System.out.println("[" + LocalTime.now() + "] === 2. DEMO: RACE CONDITION - SCHEDULER (SINGLETON FAULT)   ===");
+                System.out.println("[" + LocalTime.now() + "] ===    FaultyScheduler (Check-then-act nesincronizat)       ===");
+                System.out.println("[" + LocalTime.now() + "] ===    Demonstreaza: Multi-instantiere si cozi inexistente  ===");
+                System.out.println("[" + LocalTime.now() + "] ===============================================================");
                 demo(FaultyScheduler.class, SafeStamp.class, SafeCounter.class, BlockingOfficeQueue.class, count);
             }
             case RACE_CONDITION_QUEUE -> {
-                System.out.println("\n===============================================================");
-                System.out.println("=== 3. DEMO: RACE CONDITION - OFFICE QUEUE (DATA INCOHERENCE) ===");
-                System.out.println("===    FaultyOfficeQueue (LinkedList nesincronizata)        ===");
-                System.out.println("===    Demonstreaza: Pierdere tichete si comportament non-blocant ===");
-                System.out.println("===============================================================");
+                System.out.println("\n[" + LocalTime.now() + "] ===============================================================");
+                System.out.println("[" + LocalTime.now() + "] === 3. DEMO: RACE CONDITION - OFFICE QUEUE (DATA INCOHERENCE) ===");
+                System.out.println("[" + LocalTime.now() + "] ===    FaultyOfficeQueue (LinkedList nesincronizata)        ===");
+                System.out.println("[" + LocalTime.now() + "] ===    Demonstreaza: Pierdere tichete si comportament non-blocant ===");
+                System.out.println("[" + LocalTime.now() + "] ===============================================================");
                 demo(Scheduler.class, SafeStamp.class, SafeCounter.class, FaultyOfficeQueue.class, count);
             }
             case RACE_CONDITION_COUNTER -> {
-                System.out.println("\n===============================================================");
-                System.out.println("=== 4. DEMO: RACE CONDITION - DOCUMENT COUNTER (LOST UPDATES) ===");
-                System.out.println("===    UnsafeCounter (count++ nesincronizat)                ===");
-                System.out.println("===    SafeStamp (evita deadlock) + UnsafeCounter           ===");
-                System.out.println("===    Demonstreaza: Pierderi de inregistrari la concurenta  ===");
-                System.out.println("===============================================================");
+                System.out.println("\n[" + LocalTime.now() + "] ===============================================================");
+                System.out.println("[" + LocalTime.now() + "] === 4. DEMO: RACE CONDITION - DOCUMENT COUNTER (LOST UPDATES) ===");
+                System.out.println("[" + LocalTime.now() + "] ===    UnsafeCounter (count++ nesincronizat)                ===");
+                System.out.println("[" + LocalTime.now() + "] ===    SafeStamp (evita deadlock) + UnsafeCounter           ===");
+                System.out.println("[" + LocalTime.now() + "] ===    Demonstreaza: Pierderi de inregistrari la concurenta  ===");
+                System.out.println("[" + LocalTime.now() + "] ===============================================================");
                 demo(Scheduler.class, SafeStamp.class, UnsafeCounter.class, BlockingOfficeQueue.class, count);
             }
             case DEADLOCK -> {
-                System.out.println("\n===============================================================");
-                System.out.println("=== 5. DEMO: DEADLOCK (CIRCULAR WAIT PE RESURSE PARTAJATE)   ===");
-                System.out.println("===    UnsafeStamp (lock blocant) + UnsafeCounter (lock blocant) ===");
-                System.out.println("===    Demonstreaza: Circular Wait intre ghisee concurente  ===");
-                System.out.println("===============================================================");
+                System.out.println("\n[" + LocalTime.now() + "] ===============================================================");
+                System.out.println("[" + LocalTime.now() + "] === 5. DEMO: DEADLOCK (CIRCULAR WAIT PE RESURSE PARTAJATE)   ===");
+                System.out.println("[" + LocalTime.now() + "] ===    UnsafeStamp (lock blocant) + UnsafeCounter (lock blocant) ===");
+                System.out.println("[" + LocalTime.now() + "] ===    Demonstreaza: Circular Wait intre ghisee concurente  ===");
+                System.out.println("[" + LocalTime.now() + "] ===============================================================");
                 demo(Scheduler.class, UnsafeStamp.class, UnsafeCounter.class, BlockingOfficeQueue.class, count);
             }
             case ALL_DEMOS -> {
-                System.out.println("\n***************************************************************");
-                System.out.println("*** RULARE TOATE VARIANTELE DE DEMO (DEADLOCK RAMANE ULTIMUL) ***");
-                System.out.println("***************************************************************\n");
+                System.out.println("\n[" + LocalTime.now() + "] ***************************************************************");
+                System.out.println("[" + LocalTime.now() + "] *** RULARE TOATE VARIANTELE DE DEMO (DEADLOCK RAMANE ULTIMUL) ***");
+                System.out.println("[" + LocalTime.now() + "] ***************************************************************\n");
 
                 // 1. All-Good Demo
                 runDemo(DemoVariant.ALL_GOOD, count);
@@ -796,7 +810,7 @@ public class Demo {
             guardStatusDesc = "INACTIV";
         }
 
-        System.out.printf(">>> Lansare demonstratie: %s (Numar cetateni per scenariu: %d, Deadlock Guard: %s) <<<\n",
+        System.out.printf("[" + LocalTime.now() + "] >>> Lansare demonstratie: %s (Numar cetateni per scenariu: %d, Deadlock Guard: %s) <<<\n",
                 variant, count, guardStatusDesc);
         demoInstance.runDemo(variant, count);
     }
