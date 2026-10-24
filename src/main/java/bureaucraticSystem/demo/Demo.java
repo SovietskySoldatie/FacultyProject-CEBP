@@ -71,7 +71,7 @@ public class Demo {
     /**
      * Variabila statica ce retine varianta de demo selectata pentru executie (setata la build time).
      */
-    private static DemoVariant selectedDemo = DemoVariant.ALL_DEMOS;
+    private static DemoVariant selectedDemo = DemoVariant.RACE_CONDITION_QUEUE;
 
     public static DemoVariant getSelectedDemo() {
         return selectedDemo;
@@ -84,7 +84,7 @@ public class Demo {
     /**
      * Numarul implicit de cetateni per scenariu pentru demonstratii (setat la build time).
      */
-    public static final int DEFAULT_CLIENT_COUNT = 100;
+    public static final int DEFAULT_CLIENT_COUNT = 10000;
     private static int defaultClientCount = DEFAULT_CLIENT_COUNT;
 
     public static int getDefaultClientCount() {
@@ -105,12 +105,25 @@ public class Demo {
      */
     private static boolean deadlockGuardActive = false;
 
+    /**
+     * Durata maxima de asteptare in secunde pentru Deadlock Guard (0 sau negativ = auto-calculat dinamic prin formula).
+     */
+    private static long deadlockTimeoutSeconds = 0;
+
     public static boolean isDeadlockGuardActive() {
         return deadlockGuardActive;
     }
 
     public static void setDeadlockGuardActive(boolean active) {
         deadlockGuardActive = active;
+    }
+
+    public static long getDeadlockTimeoutSeconds() {
+        return deadlockTimeoutSeconds;
+    }
+
+    public static void setDeadlockTimeoutSeconds(long seconds) {
+        deadlockTimeoutSeconds = Math.max(0, seconds);
     }
 
     // Birouri administrative (7 Offices)
@@ -514,8 +527,13 @@ public class Demo {
         // -------------------------------------------------------------
         try {
             if (deadlockGuardActive) {
-                long estimatedMs = (long) Math.ceil((clientCount * 10.0 / workers.size()) * 1000L) + 25_000L;
-                long timeoutMs = Math.max(45_000L, estimatedMs);
+                long timeoutMs;
+                if (deadlockTimeoutSeconds > 0) {
+                    timeoutMs = deadlockTimeoutSeconds * 1000L;
+                } else {
+                    long estimatedMs = (long) Math.ceil((clientCount * 10.0 / workers.size()) * 1000L) + 25_000L;
+                    timeoutMs = Math.max(45_000L, estimatedMs);
+                }
                 long deadlineMs = System.currentTimeMillis() + timeoutMs;
 
                 for (Thread ct : clientThreads) {
@@ -740,11 +758,46 @@ public class Demo {
 
         if (args != null && args.length > 2) {
             String guardArg = args[2].trim().toLowerCase();
-            deadlockGuardActive = "true".equals(guardArg) || "guard".equals(guardArg) || "active".equals(guardArg);
+            try {
+                // Suporta direct numar de secunde ca al 3-lea argument (ex: DEADLOCK 100 15)
+                long seconds = Long.parseLong(guardArg.replaceAll("[^0-9]", ""));
+                if (seconds > 0) {
+                    deadlockGuardActive = true;
+                    deadlockTimeoutSeconds = seconds;
+                } else {
+                    deadlockGuardActive = false;
+                    deadlockTimeoutSeconds = 0;
+                }
+            } catch (NumberFormatException e) {
+                // Sau valori booleene / etichete (ex: DEADLOCK 100 true / guard / active)
+                deadlockGuardActive = "true".equals(guardArg) || "guard".equals(guardArg)
+                        || "active".equals(guardArg) || "yes".equals(guardArg) || "1".equals(guardArg);
+            }
+        }
+
+        if (args != null && args.length > 3) {
+            String timeArg = args[3].trim().toLowerCase();
+            try {
+                // Al 4-lea argument: durata explicita a timeout-ului in secunde (ex: DEADLOCK 100 true 15)
+                long seconds = Long.parseLong(timeArg.replaceAll("[^0-9]", ""));
+                if (seconds > 0) {
+                    deadlockTimeoutSeconds = seconds;
+                    deadlockGuardActive = true;
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+
+        String guardStatusDesc;
+        if (deadlockGuardActive) {
+            guardStatusDesc = (deadlockTimeoutSeconds > 0)
+                    ? "ACTIV (" + deadlockTimeoutSeconds + "s)"
+                    : "ACTIV (auto/formula)";
+        } else {
+            guardStatusDesc = "INACTIV";
         }
 
         System.out.printf(">>> Lansare demonstratie: %s (Numar cetateni per scenariu: %d, Deadlock Guard: %s) <<<\n",
-                variant, count, deadlockGuardActive ? "ACTIV" : "INACTIV");
+                variant, count, guardStatusDesc);
         demoInstance.runDemo(variant, count);
     }
 }
