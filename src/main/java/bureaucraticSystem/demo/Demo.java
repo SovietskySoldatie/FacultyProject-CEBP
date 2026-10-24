@@ -13,6 +13,7 @@ import bureaucraticSystem.counter.OfficeQueue;
 import bureaucraticSystem.resource.CoffeeBreakScheduler;
 import bureaucraticSystem.resource.DocumentCounter;
 import bureaucraticSystem.resource.OfficialStamp;
+import bureaucraticSystem.resource.DeadlockStamp;
 import bureaucraticSystem.resource.SafeCounter;
 import bureaucraticSystem.resource.SafeStamp;
 import bureaucraticSystem.resource.UnsafeCounter;
@@ -368,7 +369,7 @@ public class Demo {
                                      Class<? extends DocumentCounter> counterClass,
                                      Class<? extends OfficeQueue> queueClass,
                                      int clientCount) throws Exception {
-        Class<? extends DeskWorker> workerClass = (counterClass != null && UnsafeCounter.class.isAssignableFrom(counterClass) && SafeStamp.class.isAssignableFrom(stampClass))
+        Class<? extends DeskWorker> workerClass = (counterClass != null && UnsafeCounter.class.isAssignableFrom(counterClass) && (SafeStamp.class.isAssignableFrom(stampClass) || UnsafeStamp.class.isAssignableFrom(stampClass)))
                 ? DeskWorkerUnsafe.class
                 : DeskWorkerSafe.class;
         executeSimulation(dispatcherClass, stampClass, counterClass, queueClass, workerClass, clientCount);
@@ -387,7 +388,7 @@ public class Demo {
             queueClass = BlockingOfficeQueue.class;
         }
         if (workerClass == null) {
-            workerClass = (UnsafeCounter.class.isAssignableFrom(counterClass) && SafeStamp.class.isAssignableFrom(stampClass))
+            workerClass = (UnsafeCounter.class.isAssignableFrom(counterClass) && (SafeStamp.class.isAssignableFrom(stampClass) || UnsafeStamp.class.isAssignableFrom(stampClass)))
                     ? DeskWorkerUnsafe.class
                     : DeskWorkerSafe.class;
         }
@@ -729,18 +730,18 @@ public class Demo {
                 System.out.println("[" + LocalTime.now() + "] === 4. DEMO: RACE CONDITION - DOCUMENT COUNTER (LOST UPDATES) ===");
                 System.out.println("[" + LocalTime.now() + "] ===    UnsafeCounter (count++ nesincronizat)                ===");
                 System.out.println("[" + LocalTime.now() + "] ===    DeskWorkerUnsafe (apel neprotejat la contor)         ===");
-                System.out.println("[" + LocalTime.now() + "] ===    SafeStamp (evita deadlock) + UnsafeCounter           ===");
+                System.out.println("[" + LocalTime.now() + "] ===    UnsafeStamp (cedeaza resursa, fara lock exclusiv)    ===");
                 System.out.println("[" + LocalTime.now() + "] ===    Demonstreaza: Pierderi de inregistrari la concurenta  ===");
                 System.out.println("[" + LocalTime.now() + "] ===============================================================");
-                demo(Scheduler.class, SafeStamp.class, UnsafeCounter.class, BlockingOfficeQueue.class, DeskWorkerUnsafe.class, count);
+                demo(Scheduler.class, UnsafeStamp.class, UnsafeCounter.class, BlockingOfficeQueue.class, DeskWorkerUnsafe.class, count);
             }
             case DEADLOCK -> {
                 System.out.println("\n[" + LocalTime.now() + "] ===============================================================");
                 System.out.println("[" + LocalTime.now() + "] === 5. DEMO: DEADLOCK (CIRCULAR WAIT PE RESURSE PARTAJATE)   ===");
-                System.out.println("[" + LocalTime.now() + "] ===    UnsafeStamp (lock blocant) + UnsafeCounter (lock blocant) ===");
+                System.out.println("[" + LocalTime.now() + "] ===    DeadlockStamp (lock blocant) + UnsafeCounter (lock blocant) ===");
                 System.out.println("[" + LocalTime.now() + "] ===    Demonstreaza: Circular Wait intre ghisee concurente  ===");
                 System.out.println("[" + LocalTime.now() + "] ===============================================================");
-                demo(Scheduler.class, UnsafeStamp.class, UnsafeCounter.class, BlockingOfficeQueue.class, count);
+                demo(Scheduler.class, DeadlockStamp.class, UnsafeCounter.class, BlockingOfficeQueue.class, count);
             }
             case ALL_DEMOS -> {
                 System.out.println("\n[" + LocalTime.now() + "] ***************************************************************");
