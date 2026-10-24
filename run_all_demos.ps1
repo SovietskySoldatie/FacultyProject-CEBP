@@ -1,6 +1,6 @@
-param (
-    [int]$ClientCount = 100
-)
+# Fixed demo settings: 100 clients per scenario and 600 seconds (10 minutes) timeout guard
+$ClientCount = 100
+$TimeoutSeconds = 600
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ScriptDir
@@ -10,13 +10,11 @@ if (-not (Test-Path $LogsDir)) {
     New-Item -ItemType Directory -Path $LogsDir | Out-Null
 }
 
-$DeadlockTimeoutSeconds = 300 # 5 minutes
-
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host " Starting Bureaucratic System Demos Execution" -ForegroundColor Cyan
 Write-Host " Citizens per scenario: $ClientCount"
 Write-Host " Logs destination:      $LogsDir"
-Write-Host " Deadlock Guard:        Active ONLY for DEADLOCK (Timeout: ${DeadlockTimeoutSeconds}s)"
+Write-Host " Timeout Guard:         Active for RACE_CONDITION_QUEUE and DEADLOCK (Timeout: ${TimeoutSeconds}s)"
 Write-Host "=================================================================" -ForegroundColor Cyan
 
 # Compile project before running
@@ -48,20 +46,20 @@ function Run-DemoScenario {
     Start-Sleep -Seconds 1
 }
 
-# 1. ALL_GOOD
+# 1. ALL_GOOD (Safe components, completes naturally in ~430s)
 Run-DemoScenario -Mode "ALL_GOOD" -Guard "false" -Timeout "" -LogFileName "all_good.log"
 
-# 2. RACE_CONDITION_SCHEDULER
+# 2. RACE_CONDITION_SCHEDULER (Singleton fault, clients terminate immediately on missing queues)
 Run-DemoScenario -Mode "RACE_CONDITION_SCHEDULER" -Guard "false" -Timeout "" -LogFileName "race_condition_scheduler.log"
 
-# 3. RACE_CONDITION_QUEUE
-Run-DemoScenario -Mode "RACE_CONDITION_QUEUE" -Guard "false" -Timeout "" -LogFileName "race_condition_queue.log"
+# 3. RACE_CONDITION_QUEUE (Unsafe LinkedList queue: drops tickets causing clients to hang; requires timeout guard)
+Run-DemoScenario -Mode "RACE_CONDITION_QUEUE" -Guard "true" -Timeout $TimeoutSeconds -LogFileName "race_condition_queue.log"
 
-# 4. RACE_CONDITION_COUNTER
+# 4. RACE_CONDITION_COUNTER (Non-atomic counter lost updates, safe stamp/queue, completes naturally)
 Run-DemoScenario -Mode "RACE_CONDITION_COUNTER" -Guard "false" -Timeout "" -LogFileName "race_condition_counter.log"
 
-# 5. DEADLOCK (Deadlock Guard active with 300s / 5min runtime)
-Run-DemoScenario -Mode "DEADLOCK" -Guard "true" -Timeout $DeadlockTimeoutSeconds -LogFileName "deadlock.log"
+# 5. DEADLOCK (UnsafeStamp + UnsafeCounter circular wait: deadlocks desks; requires timeout guard)
+Run-DemoScenario -Mode "DEADLOCK" -Guard "true" -Timeout $TimeoutSeconds -LogFileName "deadlock.log"
 
 Write-Host ""
 Write-Host "=================================================================" -ForegroundColor Cyan

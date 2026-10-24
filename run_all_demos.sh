@@ -7,17 +7,15 @@ cd "$SCRIPT_DIR"
 LOGS_DIR="logs"
 mkdir -p "$LOGS_DIR"
 
-# Client count per demo (default: 100, can be overridden via CLI: ./run_all_demos.sh 50)
-CLIENT_COUNT="${1:-100}"
-
-# Deadlock timeout in seconds: roughly 300s (5 minutes)
-DEADLOCK_TIMEOUT_SECONDS=300
+# Fixed demo settings: 100 clients per scenario and 600 seconds (10 minutes) timeout guard
+CLIENT_COUNT=100
+TIMEOUT_SECONDS=600
 
 echo "================================================================="
 echo " Starting Bureaucratic System Demos Execution"
 echo " Citizens per scenario: $CLIENT_COUNT"
 echo " Logs destination:      $SCRIPT_DIR/$LOGS_DIR"
-echo " Deadlock Guard:        Active ONLY for DEADLOCK (Timeout: ${DEADLOCK_TIMEOUT_SECONDS}s)"
+echo " Timeout Guard:         Active for RACE_CONDITION_QUEUE and DEADLOCK (Timeout: ${TIMEOUT_SECONDS}s)"
 echo "================================================================="
 
 # Compile the latest Java bytecode before running
@@ -46,20 +44,20 @@ run_demo() {
     sleep 1
 }
 
-# 1. ALL_GOOD (Safe components, deadlock guard inactive)
+# 1. ALL_GOOD (Safe components, completes naturally in ~430s)
 run_demo "ALL_GOOD" "false" "" "all_good.log"
 
-# 2. RACE_CONDITION_SCHEDULER (Singleton fault, deadlock guard inactive)
+# 2. RACE_CONDITION_SCHEDULER (Singleton fault, clients terminate immediately on missing queues)
 run_demo "RACE_CONDITION_SCHEDULER" "false" "" "race_condition_scheduler.log"
 
-# 3. RACE_CONDITION_QUEUE (Unsafe LinkedList queue, deadlock guard inactive)
-run_demo "RACE_CONDITION_QUEUE" "false" "" "race_condition_queue.log"
+# 3. RACE_CONDITION_QUEUE (Unsafe LinkedList queue: drops tickets causing clients to hang; requires timeout guard)
+run_demo "RACE_CONDITION_QUEUE" "true" "$TIMEOUT_SECONDS" "race_condition_queue.log"
 
-# 4. RACE_CONDITION_COUNTER (Non-atomic counter lost updates, deadlock guard inactive)
+# 4. RACE_CONDITION_COUNTER (Non-atomic counter lost updates, safe stamp/queue, completes naturally)
 run_demo "RACE_CONDITION_COUNTER" "false" "" "race_condition_counter.log"
 
-# 5. DEADLOCK (UnsafeStamp + UnsafeCounter circular wait, deadlock guard active with 300s / 5min timeout)
-run_demo "DEADLOCK" "true" "$DEADLOCK_TIMEOUT_SECONDS" "deadlock.log"
+# 5. DEADLOCK (UnsafeStamp + UnsafeCounter circular wait: deadlocks desks; requires timeout guard)
+run_demo "DEADLOCK" "true" "$TIMEOUT_SECONDS" "deadlock.log"
 
 echo ""
 echo "================================================================="
