@@ -88,12 +88,14 @@ mvn compile
 java -cp target/classes bureaucraticSystem.demo.Demo 2>&1 | Tee-Object -FilePath demo_output.log
 
 # 3. Or run specific scenario with CLI overrides:
-# Syntax: java -cp target/classes bureaucraticSystem.demo.Demo <MODE> [CLIENT_COUNT] [GUARD_ACTIVE]
+# Syntax: java -cp target/classes bureaucraticSystem.demo.Demo <MODE> [CLIENT_COUNT] [GUARD_ACTIVE] [TIMEOUT_SECONDS]
 java -cp target/classes bureaucraticSystem.demo.Demo GOOD 10
 java -cp target/classes bureaucraticSystem.demo.Demo SCHEDULER 20
 java -cp target/classes bureaucraticSystem.demo.Demo QUEUE 50
 java -cp target/classes bureaucraticSystem.demo.Demo COUNTER 100
 java -cp target/classes bureaucraticSystem.demo.Demo DEADLOCK 10 true
+java -cp target/classes bureaucraticSystem.demo.Demo DEADLOCK 10 true 5     # Guard activ cu timeout explicit de 5 secunde
+java -cp target/classes bureaucraticSystem.demo.Demo DEADLOCK 10 5          # Prescurtat: durata numerica activeaza automat guard-ul
 ```
 
 
