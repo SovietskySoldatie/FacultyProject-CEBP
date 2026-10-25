@@ -75,7 +75,7 @@ public class Demo {
     /**
      * Variabila statica ce retine varianta de demo selectata pentru executie (setata la build time).
      */
-    private static DemoVariant selectedDemo = DemoVariant.RACE_CONDITION_QUEUE;
+    private static DemoVariant selectedDemo = DemoVariant.ALL_GOOD;
 
     public static DemoVariant getSelectedDemo() {
         return selectedDemo;

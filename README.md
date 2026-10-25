@@ -8,47 +8,6 @@ Project original specs may be found under the "original specs" folder.
 The full project specifications may be found at https://docs.google.com/document/d/1L7y-9PixbeBWSjfRTmJsURariE3YkuhAN-OvhlYhYVU/edit?tab=t.0
 Requirements may be found under the "reqs" folder.
 
-## TO-DOs:
-- [x] Add specs & reqs
-	- [x] Add project original specifications ([`original specs/specs.md`](original%20specs/specs.md))
-	- [x] Decompose project specifications
-	- [x] Add requirements ([`reqs/reqs.md`](reqs/reqs.md))
-	- [x] Decompose project requirements
-- [x] Define project architecture
-	- [x] Define software architecture
-		- [x] Create package structure
-		- [x] Create interfaces (`TicketDispatcher`, `OfficialStamp`, `DocumentCounter`, `OfficeQueue`)
-		- [x] Improve architecture
-			- [x] Add diagrams (Mermaid diagrams in [`reqs.md`](reqs/reqs.md))
-			- [x] Better define logic separation (5 modular layers)
-			- [x] Better define interfaces (polymorphic Dependency Injection for faults)
-			- [x] Keep architecture up-to-date
-- [x] Implement code
-	- [x] Initial ramp-up
-		- [x] Implement base app logic
-		- [x] Implement dependencies related logic (4-tier DAG with 10 documents)
-		- [x] Implement scheduler & resource management logic
-		- [x] Implement requests logic
-	- [x] Polish and review code
-		- [x] Verify Scheduler component for thread-safety (DCL Singleton, `volatile`, cancellation)
-	- [x] Create an executable demo ([`Demo.java`](src/main/java/bureaucraticSystem/demo/Demo.java))
-		- [x] Demo preparations
-			- [x] Simulation extensions
-				- [x] Scale in size (7 offices, 10 desks, 10 documents, configurable client counts up to large batches)
-				- [x] Overlapping routing (Dual target documents: `Pasaport` & `PUZ` both traverse all 7 offices)
-				- [x] Graceful shutdown and deadlock timeout guard
-			- [x] Fault introductions (via Dependency Injection)
-				- [x] OfficeQueue :: `FaultyOfficeQueue` (unsynchronized `LinkedList` data race & dropped tickets)
-				- [x] Scheduler :: `FaultyScheduler` (Check-Then-Act Singleton race condition creating multiple instances)
-				- [x] DocumentCounter :: `UnsafeCounter` (unsynchronized `count++` lost updates)
-				- [x] Shared Resources :: `UnsafeStamp` + `UnsafeCounter` (Circular Wait Deadlock with reversed lock orders)
-		- [x] Polish the demo (`DemoVariant` enum, build-time configurations, CLI flags, graceful resource teardown)
-	- [] Present the demo (Oral evaluation - Week 5)
-- [/] Implement tests
-	- [x] Unit & Integration suites (`TestMember2`, `TestMember2Fault`, `MainTest`, `TestSafe`)
-	- [] Move tests to `src/test/java` folder
-	- [x] Add test & fault documentation in [`reqs.md`](reqs/reqs.md)
-
 ---
 
 ## Current Code & Executable Demo Status
@@ -102,3 +61,44 @@ java -cp target/classes bureaucraticSystem.demo.Demo DEADLOCK 10 5          # Pr
 
 Kind regards,
 ![Real scrum master](./.important/RealScrumBTW.jpeg)
+
+## TO-DOs:
+- [x] Add specs & reqs
+	- [x] Add project original specifications ([`original specs/specs.md`](original%20specs/specs.md))
+	- [x] Decompose project specifications
+	- [x] Add requirements ([`reqs/reqs.md`](reqs/reqs.md))
+	- [x] Decompose project requirements
+- [x] Define project architecture
+	- [x] Define software architecture
+		- [x] Create package structure
+		- [x] Create interfaces (`TicketDispatcher`, `OfficialStamp`, `DocumentCounter`, `OfficeQueue`)
+		- [x] Improve architecture
+			- [x] Add diagrams (Mermaid diagrams in [`reqs.md`](reqs/reqs.md))
+			- [x] Better define logic separation (5 modular layers)
+			- [x] Better define interfaces (polymorphic Dependency Injection for faults)
+			- [x] Keep architecture up-to-date
+- [x] Implement code
+	- [x] Initial ramp-up
+		- [x] Implement base app logic
+		- [x] Implement dependencies related logic (4-tier DAG with 10 documents)
+		- [x] Implement scheduler & resource management logic
+		- [x] Implement requests logic
+	- [x] Polish and review code
+		- [x] Verify Scheduler component for thread-safety (DCL Singleton, `volatile`, cancellation)
+	- [x] Create an executable demo ([`Demo.java`](src/main/java/bureaucraticSystem/demo/Demo.java))
+		- [x] Demo preparations
+			- [x] Simulation extensions
+				- [x] Scale in size (7 offices, 10 desks, 10 documents, configurable client counts up to large batches)
+				- [x] Overlapping routing (Dual target documents: `Pasaport` & `PUZ` both traverse all 7 offices)
+				- [x] Graceful shutdown and deadlock timeout guard
+			- [x] Fault introductions (via Dependency Injection)
+				- [x] OfficeQueue :: `FaultyOfficeQueue` (unsynchronized `LinkedList` data race & dropped tickets)
+				- [x] Scheduler :: `FaultyScheduler` (Check-Then-Act Singleton race condition creating multiple instances)
+				- [x] DocumentCounter :: `UnsafeCounter` (unsynchronized `count++` lost updates)
+				- [x] Shared Resources :: `UnsafeStamp` + `UnsafeCounter` (Circular Wait Deadlock with reversed lock orders)
+		- [x] Polish the demo (`DemoVariant` enum, build-time configurations, CLI flags, graceful resource teardown)
+	- [] Present the demo (Oral evaluation - Week 5)
+- [/] Implement tests
+	- [x] Unit & Integration suites (`TestMember2`, `TestMember2Fault`, `MainTest`, `TestSafe`)
+	- [] Move tests to `src/test/java` folder
+	- [x] Add test & fault documentation in [`reqs.md`](reqs/reqs.md)
