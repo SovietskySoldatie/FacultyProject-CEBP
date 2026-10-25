@@ -1,5 +1,6 @@
 package bureaucraticSystem.resource;
 
+import java.time.LocalTime;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -65,14 +66,14 @@ public class CoffeeBreakScheduler {
                     if (state.onBreak.get()) return;
 
                     state.onBreak.set(true);
-                    System.out.println(deskId + " is on coffee break!");
+                    System.out.println("[" + LocalTime.now() + "] " + deskId + " is on coffee break!");
 
                     state.resetTask = executor.schedule(() -> {
                         synchronized (state) {
                             // VERIFICAREA CHEIE: Doar dacă generația este aceeași, modificăm starea
                             if (state.generation == currentGen) {
                                 state.onBreak.set(false);
-                                System.out.println(deskId + " is back from coffee break.");
+                                System.out.println("[" + LocalTime.now() + "] " + deskId + " is back from coffee break.");
                             }
                         }
                     }, breakDurationSec, TimeUnit.SECONDS);

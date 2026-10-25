@@ -1,4 +1,5 @@
 package bureaucraticSystem.resource;
+import java.time.LocalTime;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class UnsafeCounter implements DocumentCounter {
@@ -20,7 +21,7 @@ public class UnsafeCounter implements DocumentCounter {
     @Override
     public int increment(String deskId) {
         count++;
-        System.out.println("Unsafe counter " + deskId + " registered. Total: " + count);
+        System.out.println("[" + LocalTime.now() + "] Unsafe counter " + deskId + " registered. Total: " + count);
         return count;
     }
 
