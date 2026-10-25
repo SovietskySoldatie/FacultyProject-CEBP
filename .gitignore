@@ -1,3 +1,7 @@
+### log files ###
+*.log
+logs/
+
 ### Maven + build artifacts ###
 target/
 !.mvn/wrapper/maven-wrapper.jar
